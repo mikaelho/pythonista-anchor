@@ -11,8 +11,6 @@ from itertools import accumulate
 
 import ui
 
-from scripter import *
-
 
 _anchor_rules_spec = """
 left:
@@ -710,9 +708,7 @@ class Flow:
         self.superview = superview
         self.super_at = at(superview)
     
-    @script    
     def _flow(self, corner, size, func, *views):
-        yield
         assert len(views) > 0, 'Give at least one view for the flow'
         first = views[0]
         getattr(dock(self.superview), corner)(first)
@@ -782,141 +778,4 @@ def size_to_fit(view):
     if type(view) is ui.Button:
         view.frame = view.frame.inset(0, -At.gap)
     return view
-        
-    
-if __name__ == '__main__':
-    
 
-    class Marker(ui.View):
-        
-        def __init__(self, superview, image=None, radius=15):
-            super().__init__(
-                background_color='black',
-                border_color='white',
-                border_width=1,
-            )
-            self.radius = radius
-            self.width = self.height = 2 * radius
-            self.corner_radius = self.width/2
-            superview.add_subview(self)
-            
-            if image:
-                iv = ui.ImageView(
-                    image=ui.Image(image),
-                    content_mode=ui.CONTENT_SCALE_ASPECT_FIT,
-                    frame=self.bounds,
-                    flex='WH',
-                )
-                self.add_subview(iv)
-    
-            
-    class Mover(Marker):
-        
-        def __init__(self, superview, **kwargs):
-            super().__init__(superview,     
-                image='iow:arrow_expand_24',
-                **kwargs)
-        
-        def touch_moved(self, t):
-            self.center += t.location - t.prev_location
-    
-    v = ui.View(
-        background_color='black',
-    )
-    set_scripter_view(v)
-    
-    sv = ui.View()
-    dock(v).all(sv, At.TIGHT)
-    
-    main_view = ui.Label(
-        text='',
-        text_color='white',
-        alignment=ui.ALIGN_RIGHT,
-        border_color='white',
-        border_width=1,
-        frame=sv.bounds,
-        flex='WH',
-        touch_enabled=True,
-    )
-    
-    menu_view = ui.Label(
-        text='MENU',
-        text_color='white',
-        alignment=ui.ALIGN_CENTER,
-        border_color='white',
-        border_width=1,
-        background_color='grey',
-        frame=sv.bounds,
-        width=300,
-        flex='H'
-    )
-    
-    sv.add_subview(menu_view)
-    sv.add_subview(main_view)
-    
-    def open_and_close(sender):
-        
-        x(
-            main_view, 
-            0 if main_view.x > 0 else menu_view.width, 
-            ease_func=ease_in_out,
-            duration=1,
-        )
-    
-    menu_button = ui.Button(
-        image=ui.Image('iow:drag_32'),
-        tint_color='white',
-        action=open_and_close)
-    dock(main_view).top_left(menu_button)
-
-    At(menu_view).right = At(main_view).left
-    mv = At(main_view)
-    
-    bottom_bar = ui.View(
-        background_color='grey',
-    )
-    dock(main_view).bottom(bottom_bar)
-
-    pointer = ui.ImageView(
-        image=ui.Image('iow:ios7_navigate_outline_256'),
-        width=36,
-        height=36,
-        content_mode=ui.CONTENT_SCALE_ASPECT_FIT,
-    )
-    
-    dock(main_view).center(pointer)
-    at(pointer).heading_adjustment = math.pi / 4
-    
-    mover = Mover(main_view)
-    mover.center = (100,100)
-    
-    stretcher = ui.View(
-        background_color='grey',
-        height=30
-    )
-    main_view.add_subview(stretcher)
-    at(stretcher).left = at(mover).center_x
-    at(stretcher).center_y = at(main_view).height * 4/6
-    at(stretcher).right = at(main_view).right
-    
-    
-    l = ui.Label(text='000',
-        font=('Anonymous Pro', 12),
-        text_color='white',
-        alignment=ui.ALIGN_CENTER,
-    )
-    l.size_to_fit()
-    main_view.add_subview(l)
-    at(l).center_x = at(pointer).center_x
-    at(l).top = at(pointer).center_y + 25
-
-    attr(l).text = at(pointer).heading + (
-        lambda angle: f"{int(math.degrees(angle))%360:03}"
-    )
-    
-    v.present('fullscreen', 
-        animated=False,
-        hide_title_bar=True,
-    )
-
-    at(pointer).heading = at(mover).center
