@@ -11,6 +11,8 @@ from itertools import accumulate
 
 import ui
 
+from anchor.observer import NSKeyValueObserving
+
 
 _anchor_rules_spec = """
 left:
@@ -172,6 +174,8 @@ fit_height:
 
 class At:
     
+    observer = NSKeyValueObserving('_at')
+    
     gap = 8  # Apple Standard gap
     safe = True  # Avoid iOS UI elements
     TIGHT = -gap
@@ -179,6 +183,9 @@ class At:
     @classmethod
     def gaps_for(cls, count):
         return (count - 1) / count * At.gap
+        
+    def on_change(self):
+        print('should change')
     
     class Anchor:
         
@@ -207,10 +214,10 @@ class At:
             else:
                 self.type = self.REGULAR
             
-            source_type = _rules.get(self.source_prop, _rules['attr']).get('type', 'neutral')
-            target_type = _rules.get(self.target_prop, _rules['attr']).get('type', 'neutral')
-            
-            #print(source_type, target_type)
+            source_type = _rules.get(self.source_prop, _rules['attr']).get(
+                'type', 'neutral')
+            target_type = _rules.get(self.target_prop, _rules['attr']).get(
+                'type', 'neutral')
 
             self.same = self.SAME if any([
                 source_type == self.NEUTRAL,
@@ -222,16 +229,33 @@ class At:
             
             if (self.type in (self.CONTAINER, self.SAFE) and
             self.NEUTRAL not in (source_type, target_type)):
-                self.same = self.SAME if self.same == self.DIFFERENT else self.DIFFERENT
+                self.same = (
+                    self.SAME
+                    if self.same == self.DIFFERENT
+                    else self.DIFFERENT
+                )
                 
             self.effective_gap = ''
             if self.same == self.DIFFERENT:
                 self.effective_gap = (
-                    f'+ {At.gap}' if target_type == self.LEADING
-                    else f'- {At.gap}')              
+                    f'+ {At.gap}'
+                    if target_type == self.LEADING
+                    else f'- {At.gap}'
+                )              
             
-        def start_script(self):
+        def start_observing(self):
             self.target_at._remove_anchor(self.target_prop)
+            self.source_at.targets.setdefault(
+                self.target_at, set()
+            ).add(self.target_prop)
+            
+            self.set_gen()
+            
+            self.source_at.on_change()
+            At.observer.observe(self.source_at.view)
+            At.observer.observe(self.target_at.view)
+            
+        def set_gen(self):
             
             if self.source_prop in _rules:
                 source_value = _rules[self.source_prop]['source'][self.type]
@@ -271,9 +295,8 @@ class At:
                     call_str = 'func(target_value, target, source)'
                 call_callable = f'target_value = {call_str}'
 
-            script_str = (f'''\
+            update_gen_str = (f'''\
                 # {self.target_prop}
-                @script  #(run_last=True)
                 def anchor_runner(source, target, scripts, func):
                     prev_value = None
                     prev_bounds = None
@@ -289,19 +312,21 @@ class At:
                             prev_bounds = target.superview.bounds
                             {call_callable}
                             {flex_set}
-                        yield
+                            yield True
+                        else:
+                            yield False
                         
-                self.target_at.running_scripts[self.target_prop] = \
+                self.target_at.sources[self.target_prop] = \
                     anchor_runner(
                         self.source_at.view, 
                         self.target_at.view,
-                        self.target_at.running_scripts,
+                        self.target_at.observers,
                         self.callable or self.target_at.callable)
                 '''
             )
-            run_script = textwrap.dedent(script_str)
+            update_gen_str = textwrap.dedent(update_gen_str)
             #print(run_script)
-            exec(run_script)
+            exec(update_gen_script)
             
         def get_choice_code(self, code):
             target_prop = self.target_prop
@@ -386,9 +411,10 @@ class At:
             at.view = view
             at.__heading = 0
             at.heading_adjustment = 0
-            at.running_scripts = {}
+            at.sources = {}
+            at.targets = {}
             at.callable = None
-            view._scripter_at = at
+            view._at = at
             return at
 
     def _prop(attribute):
@@ -409,10 +435,10 @@ class At:
         else:
             source_anchor = value
             source_anchor.set_target(self, attr_string)
-            source_anchor.start_script()
+            source_anchor.start_observing()
         
-    def _remove_anchor(self, attr_string):        
-        anchor = self.running_scripts.pop(attr_string, None)
+    def _remove_anchor(self, attr_string):
+        anchor = self.sources.pop(attr_string, None)
         if anchor:
             cancel(anchor)
         
