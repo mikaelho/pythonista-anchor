@@ -9,21 +9,27 @@ class NSKeyValueObserving(objc_plus.ObjCDelegate):
         #objc_util.retain_global(self)
         self.targets = {}
         self.observerattr = observer_attribute
+        self.observeattrs = (
+            'bounds',
+            'transform',
+            'position',
+            'anchorPoint',
+            'frame')
     
     def observe(self, target):
         objc_target = target.objc_instance
         if objc_target in self.targets: return
         self.targets[objc_target] = target
-        for key in ('bounds', 'transform', 'position', 'anchorPoint', 'frame'):
-            objc_target.layer().\
-            addObserver_forKeyPath_options_context_(
+        for key in self.observeattrs:
+            objc_target.layer().addObserver_forKeyPath_options_context_(
                 self, key, 0, None)
+        
                 
     def stop_observing(self, target):
         objc_target = target.objc_instance
         if objc_target not in self.targets: return
         del self.targets[objc_target]
-        for key in observables:
+        for key in self.observeattrs:
             objc_target.layer().\
             removeObserver_forKeyPath_(self, key)
             
@@ -40,6 +46,6 @@ class NSKeyValueObserving(objc_plus.ObjCDelegate):
             target = self.targets[objc_target]
             getattr(target, self.observerattr).on_change()
         except Exception as e:
-            print('observeValueForKeyPath:', self, e)
+            print('observeValueForKeyPath:', self, type(e), e)
 
 

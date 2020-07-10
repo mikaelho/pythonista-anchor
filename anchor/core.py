@@ -1,5 +1,3 @@
-
-
 import inspect
 import json
 import math
@@ -10,6 +8,7 @@ from functools import partialmethod, partial
 from itertools import accumulate
 
 import ui
+import objc_util
 
 from anchor.observer import NSKeyValueObserving
 
@@ -148,11 +147,11 @@ bounds:
 heading:
     type: neutral
     target:
-        attribute: target._scripter_at._heading
+        attribute: target._at._heading
         value: direction(target, source, value)
     source:
-        regular: source._scripter_at._heading
-        container: source._scripter_at._heading
+        regular: source._at._heading
+        container: source._at._heading
 attr:
     type: neutral
     target:
@@ -177,15 +176,45 @@ class At:
     observer = NSKeyValueObserving('_at')
     
     gap = 8  # Apple Standard gap
-    safe = True  # Avoid iOS UI elements
+    safe = False  # Avoid iOS UI elements
     TIGHT = -gap
     
     @classmethod
     def gaps_for(cls, count):
         return (count - 1) / count * At.gap
         
-    def on_change(self):
-        print('should change')
+    #@objc_util.on_main_thread
+    def on_change(self, force_source=True):
+        '''
+        if self.view.name:
+            print(self.view.name, self.view.frame)
+        else:
+            print(self.view, self.view.frame)
+        '''
+        if self.checking:
+            return
+        #if not self.view.on_screen:
+        #    ui.delay(partial(self.on_change, force_source), 0.1)
+        #    return 
+        self.checking = True
+        #print('--')
+        changed = False
+        for gen in self.update_gens.values():
+            #print(changed)
+            try:
+                gen_changed = next(gen)
+                changed = changed or gen_changed
+            except ValueError as e:
+                if str(e) == 'generator already executing':
+                    #print('ohno')
+                    return
+                else:
+                    raise
+        #print(changed)
+        self.checking = False
+        if changed or force_source:
+            for dependent in self.source_for:
+                dependent.on_change(force_source=False)
     
     class Anchor:
         
@@ -245,13 +274,13 @@ class At:
             
         def start_observing(self):
             self.target_at._remove_anchor(self.target_prop)
-            self.source_at.targets.setdefault(
+            self.source_at.source_for.setdefault(
                 self.target_at, set()
             ).add(self.target_prop)
             
             self.set_gen()
             
-            self.source_at.on_change()
+            self.target_at.on_change()
             At.observer.observe(self.source_at.view)
             At.observer.observe(self.target_at.view)
             
@@ -308,6 +337,7 @@ class At:
                         ) 
                         if (target_value != prev_value or 
                         target.superview.bounds != prev_bounds):
+                            #print('{self.target_prop}:', target_value)
                             prev_value = target_value
                             prev_bounds = target.superview.bounds
                             {call_callable}
@@ -316,17 +346,17 @@ class At:
                         else:
                             yield False
                         
-                self.target_at.sources[self.target_prop] = \
+                self.target_at.update_gens[self.target_prop] = \
                     anchor_runner(
                         self.source_at.view, 
                         self.target_at.view,
-                        self.target_at.observers,
+                        self.target_at.update_gens,
                         self.callable or self.target_at.callable)
                 '''
             )
             update_gen_str = textwrap.dedent(update_gen_str)
-            #print(run_script)
-            exec(update_gen_script)
+            #print(update_gen_str)
+            exec(update_gen_str)
             
         def get_choice_code(self, code):
             target_prop = self.target_prop
@@ -405,15 +435,16 @@ class At:
     
     def __new__(cls, view):
         try:
-            return view._scripter_at
+            return view._at
         except AttributeError:
             at = super().__new__(cls)
             at.view = view
             at.__heading = 0
             at.heading_adjustment = 0
-            at.sources = {}
-            at.targets = {}
+            at.source_for = {}
+            at.update_gens = {}
             at.callable = None
+            at.checking = False
             view._at = at
             return at
 
@@ -438,9 +469,9 @@ class At:
             source_anchor.start_observing()
         
     def _remove_anchor(self, attr_string):
-        anchor = self.sources.pop(attr_string, None)
-        if anchor:
-            cancel(anchor)
+        gen = self.update_gens.pop(attr_string, None)
+        if len(self.update_gens) == 0:
+            self.observer.stop_observing(self.view)
         
     @property
     def _heading(self):

@@ -1,4 +1,5 @@
 import math
+import time
 
 import ui
 
@@ -41,10 +42,19 @@ def create_area(title):
     dock(area).top_right(label, At.TIGHT)
     return area
 
+At.safe = False
+
+'''
 root = ui.View(
+    name='root',
     background_color='black',
 )
-set_scripter_view(root)
+'''
+
+root = SafeAreaView(
+    name='root',
+    background_color='black'
+)
 
 # ------ Button flow
 
@@ -67,8 +77,10 @@ buttons = [
 flow(button_area).from_top_left(*buttons)
 at(button_area).height = at(button_area).fit_height
 
-content_area = style(ui.View())
+content_area = style(ui.View(name='content_area'))
 dock(root).top(content_area, At.TIGHT)
+#dock(root).all(content_area, At.TIGHT)
+
 at(content_area).bottom = at(button_area).top - At.TIGHT
 
 at_area = create_area('basic at & flex')
@@ -234,6 +246,7 @@ if show_markers:
     ms = create_marker(root)
     at(ms).center_x = at(button_area).center_x * 1.5
     at(ms).center_y = at(button_area).bottom
+    
 
 root.present('fullscreen', 
     animated=False,
