@@ -8,7 +8,7 @@ from functools import partialmethod, partial
 from itertools import accumulate
 
 import ui
-import objc_util
+import  objc_util
 
 from anchor.observer import NSKeyValueObserving
 
@@ -177,6 +177,7 @@ class At:
     def gaps_for(cls, count):
         return (count - 1) / count * At.gap
         
+    @objc_util.on_main_thread
     def on_change(self, force_source=True):
         if self.checking:
             return

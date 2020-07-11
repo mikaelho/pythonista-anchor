@@ -4,7 +4,7 @@ import time
 import ui
 
 from anchor import *
-
+import scripter
 
 accent_color = '#cae8ff'
 
@@ -14,6 +14,13 @@ root = SafeAreaView(
     background_color='black'
 )
 
+main_content = ui.View(
+    frame=root.bounds, flex='WH',
+)
+root.add_subview(main_content)
+#dock(root).all(main_content)
+
+'''
 def style(*views):
     for v in views:
         v.background_color = 'black'
@@ -51,7 +58,7 @@ def create_area(title):
 # ------ Button flow
 
 button_area = style(ui.View())
-dock(root).bottom(button_area, At.TIGHT)
+dock(main_content).bottom(button_area, At.TIGHT)
 button_label = style_label(ui.Label(
     text='FLOW',
     font=('Arial Rounded MT Bold', 12),
@@ -70,7 +77,7 @@ flow(button_area).from_top_left(*buttons)
 at(button_area).height = at(button_area).fit_height
 
 content_area = style(ui.View(name='content_area'))
-dock(root).top(content_area, At.TIGHT)
+dock(main_content).top(content_area, At.TIGHT)
 
 at(content_area).bottom = at(button_area).top - At.TIGHT
 
@@ -90,6 +97,21 @@ def make_label(text):
     return size_to_fit(style2(ui.Label(
         text=text,
         number_of_lines=0)))
+        
+#  ----- Sidebar & menu button
+
+sidebar = style(ui.View(width=200))
+main_content.add_subview(sidebar)
+at(sidebar).top = at(main_content).top
+at(sidebar).bottom = at(main_content).bottom
+at(sidebar).right = at(main_content).left
+
+menu_button = size_to_fit(style(ui.Button(image=ui.Image('iow:ios7_drag_32'))))
+menu_button.width = menu_button.height
+dock(main_content).top_left(menu_button, At.TIGHT)
+
+#def open_and_close(sender):
+#    scripter.x(main_content)
 
 #  ----- At & flex
 
@@ -243,7 +265,7 @@ if show_markers:
     ms = create_marker(root)
     at(ms).center_x = at(button_area).center_x * 1.5
     at(ms).bottom = at(button_area).bottom
-    
+'''
 
 root.present('fullscreen', 
     animated=False,
