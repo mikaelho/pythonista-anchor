@@ -69,16 +69,16 @@ bottom_flex:
 center_x:
     type: neutral
     target:
-        attribute: target.center
-        value: (value, target.center.y)
+        attribute: target.x
+        value: value - target.width / 2
     source:
         regular: source.center.x
         container: source.bounds.center().x
 center_y:
     type: neutral
     target:
-        attribute: target.center
-        value: (target.center.x, value)
+        attribute: target.y
+        value: value - target.height / 2
     source:
         regular: source.center.y
         container: source.bounds.center().y
@@ -88,8 +88,8 @@ center:
         attribute: target.center
         value: value
     source:
-        regular: source.center
-        container: source.bounds.center()
+        regular: tuple(source.center)
+        container: tuple(source.bounds.center())
 width:
     type: neutral
     target:
@@ -180,22 +180,13 @@ class At:
     def on_change(self, force_source=True):
         if self.checking:
             return
-        #if not self.view.on_screen:
-        #    ui.delay(partial(self.on_change, force_source), 0.1)
-        #    return 
         self.checking = True
         changed = True
         while changed:
             changed = False
             for key, gen in self.update_gens.items():
-                if self.view.name in ('vbar', 'basi'):
-                    print('---')
                 gen_changed = next(gen)
                 changed = changed or gen_changed
-                if self.view.name in ('vbar', 'basi'):
-                    print(self.view.name, list(self.update_gens.keys()), key, gen_changed)
-                    if self.view.name == 'vbar':
-                        print('center_y', self.view.center.y)
             if changed:
                 force_source = True
         self.checking = False
@@ -240,8 +231,6 @@ class At:
                 target_type == self.NEUTRAL,
                 source_type == target_type,
             ]) else self.DIFFERENT
-            
-            #print(self.same)
             
             if (self.type in (self.CONTAINER, self.SAFE) and
             self.NEUTRAL not in (source_type, target_type)):
@@ -322,11 +311,9 @@ class At:
                         target_value = (
                             {flex_get}{self.get_target_value(self.target_prop)}
                         ) 
-                        if target.name and target.name == 'vbar' and ('{self.target_prop}' == 'center_y' or '{self.target_prop}' == 'height'):
-                            print(prev_value, '<->', target_value)
+
                         if (target_value != prev_value or 
                         target.superview.bounds != prev_bounds):
-                            #print('{self.target_prop}:', target_value)
                             prev_value = target_value
                             prev_bounds = target.superview.bounds
                             {call_callable}
@@ -344,7 +331,7 @@ class At:
                 '''
             )
             update_gen_str = textwrap.dedent(update_gen_str)
-            print(update_gen_str)
+            #print(update_gen_str)
             exec(update_gen_str)
             
         def get_choice_code(self, code):
@@ -521,9 +508,7 @@ def direction(target, source, value):
     """
     try:
         if len(value) == 2:
-            source_center = ui.convert_point(value, source.superview)
-            target_center = ui.convert_point(target.center, target.superview)
-            delta = source_center - target_center
+            delta = value - target.center
             value = math.atan2(delta.y, delta.x)
     except TypeError:
         pass

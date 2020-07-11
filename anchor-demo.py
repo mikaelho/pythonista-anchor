@@ -124,15 +124,19 @@ def make_symbol(character):
     symbol.corner_radius = symbol.width / 2
     return symbol
 
+pointer_area.name = 'pointer_area'
+
 target = make_symbol('⌾')
 target.font = (target.font[0], 44)
 at(target).center_x = at(pointer_area).center_x / 1.75
 at(target).center_y = at(pointer_area).height - 60
 
 pointer = make_symbol('↣')
+pointer.name = 'pointer'
 pointer.text_color = accent_color
 pointer.background_color = 'transparent'
 pointer.font = (pointer.font[0], 40)
+
 align(pointer_area).center(pointer)
 at(pointer).heading = at(target).center
 
@@ -176,7 +180,7 @@ align(align_area).center_y(l1, l2, l3)
 
 # ------ Markers
 
-show_markers = False
+show_markers = True
 
 if show_markers:
 
@@ -238,7 +242,7 @@ if show_markers:
     
     ms = create_marker(root)
     at(ms).center_x = at(button_area).center_x * 1.5
-    at(ms).center_y = at(button_area).bottom
+    at(ms).bottom = at(button_area).bottom
     
 
 root.present('fullscreen', 
