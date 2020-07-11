@@ -22,7 +22,6 @@ left:
     source:
         regular: source.x
         container: source.bounds.x
-        safe: safe.origin.x
 right:
     type: trailing
     target:
@@ -31,7 +30,6 @@ right:
     source:
         regular: source.frame.max_x
         container: source.bounds.max_x
-        safe: safe.origin.x + safe.size.width
 top:
     type: leading
     target:
@@ -40,7 +38,6 @@ top:
     source:
         regular: source.y
         container: source.bounds.y
-        safe: safe.origin.y
 bottom:
     type: trailing
     target:
@@ -49,7 +46,6 @@ bottom:
     source:
         regular: source.frame.max_y
         container: source.bounds.max_y
-        safe: safe.origin.y + safe.size.height
 left_flex:
     type: leading
     target:
@@ -102,7 +98,6 @@ width:
     source:
         regular: source.width
         container: source.bounds.width - 2 * At.gap
-        safe: safe.size.width - 2 * At.gap
 height:
     type: neutral
     target:
@@ -111,7 +106,6 @@ height:
     source:
         regular: source.height
         container: source.bounds.height - 2 * At.gap
-        safe: safe.size.height - 2 * At.gap
 position:
     type: neutral
     target:
@@ -183,36 +177,29 @@ class At:
     def gaps_for(cls, count):
         return (count - 1) / count * At.gap
         
-    #@objc_util.on_main_thread
     def on_change(self, force_source=True):
-        '''
-        if self.view.name:
-            print(self.view.name, self.view.frame)
-        else:
-            print(self.view, self.view.frame)
-        '''
         if self.checking:
             return
         #if not self.view.on_screen:
         #    ui.delay(partial(self.on_change, force_source), 0.1)
         #    return 
         self.checking = True
-        #print('--')
-        changed = False
-        for gen in self.update_gens.values():
-            #print(changed)
-            try:
+        changed = True
+        while changed:
+            changed = False
+            for key, gen in self.update_gens.items():
+                if self.view.name in ('vbar', 'basi'):
+                    print('---')
                 gen_changed = next(gen)
                 changed = changed or gen_changed
-            except ValueError as e:
-                if str(e) == 'generator already executing':
-                    #print('ohno')
-                    return
-                else:
-                    raise
-        #print(changed)
+                if self.view.name in ('vbar', 'basi'):
+                    print(self.view.name, list(self.update_gens.keys()), key, gen_changed)
+                    if self.view.name == 'vbar':
+                        print('center_y', self.view.center.y)
+            if changed:
+                force_source = True
         self.checking = False
-        if changed or force_source:
+        if force_source:
             for dependent in self.source_for:
                 dependent.on_change(force_source=False)
     
@@ -335,6 +322,8 @@ class At:
                         target_value = (
                             {flex_get}{self.get_target_value(self.target_prop)}
                         ) 
+                        if target.name and target.name == 'vbar' and ('{self.target_prop}' == 'center_y' or '{self.target_prop}' == 'height'):
+                            print(prev_value, '<->', target_value)
                         if (target_value != prev_value or 
                         target.superview.bounds != prev_bounds):
                             #print('{self.target_prop}:', target_value)
@@ -355,7 +344,7 @@ class At:
                 '''
             )
             update_gen_str = textwrap.dedent(update_gen_str)
-            #print(update_gen_str)
+            print(update_gen_str)
             exec(update_gen_str)
             
         def get_choice_code(self, code):
@@ -482,6 +471,7 @@ class At:
         self.__heading = value
         self.view.transform = ui.Transform.rotation(
             value + self.heading_adjustment)
+        self.on_change()
             
     # PUBLIC PROPERTIES
             

@@ -8,6 +8,12 @@ from anchor import *
 
 accent_color = '#cae8ff'
 
+
+root = SafeAreaView(
+    name='root',
+    background_color='black'
+)
+
 def style(*views):
     for v in views:
         v.background_color = 'black'
@@ -33,7 +39,7 @@ def style_label(v):
     return v
     
 def create_area(title):
-    area = style(ui.View())
+    area = style(ui.View(name=title[:4]))
     label = style_label(size_to_fit(ui.Label(
         text=title.upper(),
         #number_of_lines=0,
@@ -41,20 +47,6 @@ def create_area(title):
     )))
     dock(area).top_right(label, At.TIGHT)
     return area
-
-At.safe = False
-
-'''
-root = ui.View(
-    name='root',
-    background_color='black',
-)
-'''
-
-root = SafeAreaView(
-    name='root',
-    background_color='black'
-)
 
 # ------ Button flow
 
@@ -79,7 +71,6 @@ at(button_area).height = at(button_area).fit_height
 
 content_area = style(ui.View(name='content_area'))
 dock(root).top(content_area, At.TIGHT)
-#dock(root).all(content_area, At.TIGHT)
 
 at(content_area).bottom = at(button_area).top - At.TIGHT
 
@@ -102,9 +93,11 @@ def make_label(text):
 
 #  ----- At & flex
 
-vertical_bar = style(ui.View(width=10))
+vertical_bar = style(ui.View(name='vbar',
+    width=10))
 at_area.add_subview(vertical_bar)
 at(vertical_bar).center_x = at(at_area).width / 5
+
 align(at_area).center_y(vertical_bar)
 at(vertical_bar).height = at(at_area).height * 0.75
 
