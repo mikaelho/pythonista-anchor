@@ -12,6 +12,11 @@ import  objc_util
 
 from anchor.observer import NSKeyValueObserving
 
+# TODO: Implement edge/center combo
+# TODO: Detect mismatches horizontal/vertical
+
+_horizontal_anchors = 'left right center_x center width'.split()
+_horizontal_anchors = 'top bottom center_y center height'.split()
 
 _anchor_rules_spec = """
 left:
@@ -209,6 +214,7 @@ class At:
             self.modifiers = ''
             self.callable = None
             
+        # TODO: Detect too many horizontal/vertical anchors
         def set_target(self, target_at, target_prop):
             self.target_at = target_at
             self.target_prop = target_prop
@@ -445,9 +451,11 @@ class At:
             source_anchor.set_target(self, attr_string)
             source_anchor.start_observing()
         
+    # TODO: Implement removal of achors
     def _remove_anchor(self, attr_string):
+        len_before = len(self.update_gens)
         gen = self.update_gens.pop(attr_string, None)
-        if len(self.update_gens) == 0:
+        if len_before and len(self.update_gens) == 0:
             self.observer.stop_observing(self.view)
         
     @property
