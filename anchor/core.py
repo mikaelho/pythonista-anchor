@@ -3,6 +3,7 @@ import json
 import math
 import re
 import textwrap
+import warnings
 
 from functools import partialmethod, partial
 from itertools import accumulate
@@ -12,13 +13,11 @@ import  objc_util
 
 from anchor.observer import NSKeyValueObserving
 
-# TODO: Implement edge/center combo
+# TODO: Set constant
 # TODO: Detect mismatches horizontal/vertical
 
-_horizontal_anchors = 'left right center_x center width'.split()
-_horizontal_anchors = 'top bottom center_y center height'.split()
 
-_anchor_rules_spec = """
+_constraint_rules_spec = """
 left:
     type: leading
     target:
@@ -71,6 +70,26 @@ bottom_flex:
     target:
         attribute: target.height
         value: target.height + (value - (target.y + target.height))
+left_flex_center:
+    type: leading
+    target:
+        attribute: (target.x, target.width)
+        value: (value, (target.center.x - value) * 2)
+right_flex_center:
+    type: trailing
+    target:
+        attribute: (target.x, target.width)
+        value: (target.center.x - (value - target.center.x), (value - target.center.x) * 2)
+top_flex_center:
+    type: leading
+    target:
+        attribute: (target.y, target.height)
+        value: (value, (target.center.y - value) * 2)
+bottom_flex_center:
+    type: trailing
+    target:
+        attribute: (target.y, target.height)
+        value: (target.center.y - (value - target.center.y), (value - target.center.y) * 2)
 center_x:
     type: neutral
     target:
@@ -175,8 +194,9 @@ class At:
     observer = NSKeyValueObserving('_at')
     
     gap = 8  # Apple Standard gap
-    safe = False  # Avoid iOS UI elements
     TIGHT = -gap
+    constraint_warnings = True
+    superview_warnings = True
     
     @classmethod
     def gaps_for(cls, count):
@@ -200,13 +220,16 @@ class At:
             for dependent in self.source_for:
                 dependent.on_change(force_source=False)
     
-    class Anchor:
+    class Constraint:
         
-        REGULAR, CONTAINER, SAFE = 'regular', 'container', 'safe'
+        REGULAR, CONTAINER = 'regular', 'container'
         
         SAME, DIFFERENT, NEUTRAL = 'same', 'different', 'neutral'
         
         TRAILING, LEADING = 'trailing', 'leading'
+        
+        HORIZONTALS = set('left right center_x width fit_width'.split())
+        VERTICALS = set('top bottom center_y height fit_height'.split())
         
         def __init__(self, source_at, source_prop):
             self.source_at = source_at
@@ -214,17 +237,14 @@ class At:
             self.modifiers = ''
             self.callable = None
             
-        # TODO: Detect too many horizontal/vertical anchors
         def set_target(self, target_at, target_prop):
             self.target_at = target_at
             self.target_prop = target_prop
-            self.safe = At.safe and 'safe' in _rules[self.source_prop]['source']
+            
+            self._check_for_warnings()
             
             if target_at.view.superview == self.source_at.view:
-                if self.safe:
-                    self.type = self.SAFE
-                else:
-                    self.type = self.CONTAINER
+                self.type = self.CONTAINER
             else:
                 self.type = self.REGULAR
             
@@ -239,7 +259,7 @@ class At:
                 source_type == target_type,
             ]) else self.DIFFERENT
             
-            if (self.type in (self.CONTAINER, self.SAFE) and
+            if (self.type == self.CONTAINER and
             self.NEUTRAL not in (source_type, target_type)):
                 self.same = (
                     self.SAME
@@ -256,18 +276,20 @@ class At:
                 )              
             
         def start_observing(self):
-            self.target_at._remove_anchor(self.target_prop)
+            self.target_at._remove_constraint(self.target_prop)
             self.source_at.source_for.setdefault(
                 self.target_at, set()
             ).add(self.target_prop)
             
-            self.set_gen()
+            self._set_gen()
+            
+            self._check_for_impossible_constraints()
             
             self.target_at.on_change()
             At.observer.observe(self.source_at.view)
             At.observer.observe(self.target_at.view)
             
-        def set_gen(self):
+        def _set_gen(self):
             
             if self.source_prop in _rules:
                 source_value = _rules[self.source_prop]['source'][self.type]
@@ -276,24 +298,30 @@ class At:
                 source_value = _rules['attr']['source']['regular']
                 source_value = source_value.replace('_custom', self.source_prop)
             
-            get_safe = (
-                'safe = source.objc_instance.safeAreaLayoutGuide().layoutFrame()'
-                if self.safe
-                else ''
-            )
-            
             target_attribute = self.get_target_attribute(self.target_prop)
             
-            flex_get = ''
+            flex_get = f'target_value = {self.get_target_value(self.target_prop)}'
             flex_set = f'{target_attribute} = target_value'
-            opposite_prop = self.get_opposite(self.target_prop)
+            opposite_prop, center_prop = self.get_opposite(self.target_prop)
             if opposite_prop:
                 flex_prop = self.target_prop + '_flex'
-                flex_get = f'''({self.get_target_value(flex_prop)}) if '{opposite_prop}' in scripts else '''
-                flex_set = f'''if '{opposite_prop}' in scripts: '''\
-                f'''{self.get_target_attribute(flex_prop)} = target_value'''\
-                f'''
-                            else: {target_attribute} = target_value
+                flex_center_prop = self.target_prop + '_flex_center'
+                flex_get = f'''
+                        center_props = set(('center', '{center_prop}'))
+                        if '{opposite_prop}' in scripts:
+                            target_value = ({self.get_target_value(flex_prop)})
+                        elif len(center_props.intersection(set(scripts.keys()))):
+                            target_value = ({self.get_target_value(flex_center_prop)})
+                        else:
+                            target_value = {self.get_target_value(self.target_prop)}
+                '''
+                flex_set = f'''
+                            if '{opposite_prop}' in scripts:
+                                {self.get_target_attribute(flex_prop)} = target_value
+                            elif len(center_props.intersection(set(scripts.keys()))):
+                                {self.get_target_attribute(flex_center_prop)} = target_value
+                            else: 
+                                {target_attribute} = target_value
                 '''
 
             func = self.callable or self.target_at.callable
@@ -309,15 +337,13 @@ class At:
 
             update_gen_str = (f'''\
                 # {self.target_prop}
-                def anchor_runner(source, target, scripts, func):
+                def constraint_runner(source, target, scripts, func):
                     prev_value = None
                     prev_bounds = None
                     while True: 
-                        {get_safe} 
                         value = ({source_value} {self.effective_gap}) {self.modifiers}
-                        target_value = (
-                            {flex_get}{self.get_target_value(self.target_prop)}
-                        ) 
+
+                        {flex_get}
 
                         if (target_value != prev_value or 
                         target.superview.bounds != prev_bounds):
@@ -330,7 +356,7 @@ class At:
                             yield False
                         
                 self.target_at.update_gens[self.target_prop] = \
-                    anchor_runner(
+                    constraint_runner(
                         self.source_at.view, 
                         self.target_at.view,
                         self.target_at.update_gens,
@@ -374,15 +400,50 @@ class At:
             
         def get_opposite(self, prop):
             opposites = (
-                {'left', 'right'},
-                {'top', 'bottom'},
+                ({'left', 'right'}, 'center_x'),
+                ({'top', 'bottom'}, 'center_y')
             )
-            for pair in opposites:
+            for pair, center_prop in opposites:
                 try:
                     pair.remove(prop)
-                    return pair.pop()
+                    return pair.pop(), center_prop
                 except KeyError: pass
-            return None
+            return (None, None)
+
+        def _check_for_impossible_constraints(self):
+            """
+            Check for too many constraints resulting in an impossible combo
+            """
+            h = set([*self.HORIZONTALS, 'center'])
+            v = set([*self.VERTICALS, 'center'])
+            active = set(self.target_at.update_gens.keys())
+            horizontals = active.intersection(h)
+            verticals = active.intersection(v)
+            if len(horizontals) > 2:
+                raise ConstraintError(
+                    'Too many horizontal constraints', horizontals)
+            elif len(verticals) > 2:
+                raise ConstraintError(
+                    'Too many vertical constraints', verticals)
+            
+        def _check_for_warnings(self):
+            if self.target_at.constraint_warnings:
+                source_type, target_type = [
+                    'v' if c in self.VERTICALS else '' +
+                    'h' if c in self.HORIZONTALS else ''
+                    for c in (self.source_prop, self.target_prop)
+                ]
+                if source_type != target_type:
+                    warnings.warn(
+                        ConstraintWarning('Unusual constraint combination'),
+                        stacklevel=5,
+                    )
+            if self.target_at.superview_warnings:
+                if not self.target_at.view.superview:
+                    warnings.warn(
+                        ConstraintWarning('Probably missing superview'),
+                        stacklevel=5,
+                    )
             
         def __add__(self, other):
             if callable(other):
@@ -441,18 +502,18 @@ class At:
         return p
 
     def _getter(self, attr_string):
-        return At.Anchor(self, attr_string)
+        return At.Constraint(self, attr_string)
 
     def _setter(self, attr_string, value):
         if value is None:
-            self._remove_anchor(attr_string)
+            self._remove_constraint(attr_string)
         else:
             source_anchor = value
             source_anchor.set_target(self, attr_string)
             source_anchor.start_observing()
         
     # TODO: Implement removal of achors
-    def _remove_anchor(self, attr_string):
+    def _remove_constraint(self, attr_string):
         len_before = len(self.update_gens)
         gen = self.update_gens.pop(attr_string, None)
         if len_before and len(self.update_gens) == 0:
@@ -561,8 +622,18 @@ def _parse_rules(rules):
                 raise RuntimeError(f'Cannot parse line {i}', error)
     return rule_dict
     
-_rules = _parse_rules(_anchor_rules_spec)
+_rules = _parse_rules(_constraint_rules_spec)
 
+
+class ConstraintError(RuntimeError):
+    """
+    Raised on impossible constraint combos.
+    """
+
+class ConstraintWarning(RuntimeWarning):
+    """
+    Raised on suspicious constraint combos.
+    """
     
 class Dock:
     

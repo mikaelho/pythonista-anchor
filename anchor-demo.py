@@ -11,16 +11,15 @@ accent_color = '#cae8ff'
 
 root = SafeAreaView(
     name='root',
-    background_color='black'
+    background_color='black',
 )
 
 main_content = ui.View(
-    frame=root.bounds, flex='WH',
+    #frame=root.bounds, flex='WH',
 )
-root.add_subview(main_content)
-#dock(root).all(main_content)
+#root.add_subview(main_content)
+dock(root).all(main_content)
 
-'''
 def style(*views):
     for v in views:
         v.background_color = 'black'
@@ -121,7 +120,8 @@ at_area.add_subview(vertical_bar)
 at(vertical_bar).center_x = at(at_area).width / 5
 
 align(at_area).center_y(vertical_bar)
-at(vertical_bar).height = at(at_area).height * 0.75
+#at(vertical_bar).height = at(at_area).height * 0.75
+at(vertical_bar).top = at(at_area).height * 0.1
 
 fix_left = make_label('fix left')
 at_area.add_subview(fix_left)
@@ -265,7 +265,6 @@ if show_markers:
     ms = create_marker(root)
     at(ms).center_x = at(button_area).center_x * 1.5
     at(ms).bottom = at(button_area).bottom
-'''
 
 root.present('fullscreen', 
     animated=False,
