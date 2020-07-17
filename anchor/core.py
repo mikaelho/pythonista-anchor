@@ -231,19 +231,21 @@ class At:
         HORIZONTALS = set('left right center_x width fit_width'.split())
         VERTICALS = set('top bottom center_y height fit_height'.split())
         
-        def __init__(self, source_at, source_prop):
-            self.source_at = source_at
-            self.source_prop = source_prop
+        def __init__(self, at, prop):
+            self.at = at
+            self.prop = prop
             self.modifiers = ''
             self.callable = None
             
-        def set_target(self, target_at, target_prop):
-            self.target_at = target_at
-            self.target_prop = target_prop
-            
+        def set_constraint(self, source_at, source_prop):
+            self.target_at = self.at
+            self.target_prop = self.prop
+            self.source_at = source_at
+            self.source_prop = source_prop
+            #warnings.warn(f'{self.target_prop} <- {self.source_prop}', stacklevel=4)
             self._check_for_warnings()
             
-            if target_at.view.superview == self.source_at.view:
+            if self.target_at.view.superview == self.source_at.view:
                 self.type = self.CONTAINER
             else:
                 self.type = self.REGULAR
@@ -324,7 +326,7 @@ class At:
                                 {target_attribute} = target_value
                 '''
 
-            func = self.callable or self.target_at.callable
+            func = self.callable or self.source_at.callable
             call_callable = ''
             if func:
                 call_str = 'func(target_value)'
@@ -360,11 +362,12 @@ class At:
                         self.source_at.view, 
                         self.target_at.view,
                         self.target_at.update_gens,
-                        self.callable or self.target_at.callable)
+                        self.callable or self.source_at.callable)
                 '''
             )
             update_gen_str = textwrap.dedent(update_gen_str)
-            #print(update_gen_str)
+            #if self.target_prop == 'text':
+            #    print(update_gen_str)
             exec(update_gen_str)
             
         def get_choice_code(self, code):
@@ -447,7 +450,7 @@ class At:
             
         def __add__(self, other):
             if callable(other):
-                self.callable = other
+                self.at.callable = other
             else:
                 self.modifiers += f'+ {other}'
             return self
@@ -508,9 +511,12 @@ class At:
         if value is None:
             self._remove_constraint(attr_string)
         else:
+            constraint = At.Constraint(self, attr_string)
             source_anchor = value
-            source_anchor.set_target(self, attr_string)
-            source_anchor.start_observing()
+            constraint.modifiers = source_anchor.modifiers
+            constraint.set_constraint(source_anchor.at, source_anchor.prop)
+            
+            constraint.start_observing()
         
     # TODO: Implement removal of achors
     def _remove_constraint(self, attr_string):

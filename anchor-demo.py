@@ -258,13 +258,13 @@ if show_markers:
     align(last_button).center_y(mb)
     at(mb).left = at(last_button).right
     
-    mr = create_marker(root)
-    align(button_area).center_x(mr)
-    at(mr).center_y = at(button_area).top
+    mr = create_marker(content_area)
+    at(mr).right = at(content_area).right
+    at(mr).bottom = at(content_area).bottom - At.TIGHT
     
     ms = create_marker(root)
     at(ms).center_x = at(button_area).center_x * 1.5
-    at(ms).bottom = at(button_area).bottom
+    at(ms).bottom = at(button_area).bottom - At.TIGHT
 
 root.present('fullscreen', 
     animated=False,
