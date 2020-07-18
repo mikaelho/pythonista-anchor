@@ -7,6 +7,7 @@ import warnings
 
 from functools import partialmethod, partial
 from itertools import accumulate
+from types import SimpleNamespace as ns
 
 import ui
 import  objc_util
@@ -14,8 +15,7 @@ import  objc_util
 from anchor.observer import NSKeyValueObserving
 
 # TODO: Set constant
-# TODO: Detect mismatches horizontal/vertical
-
+# TODO: Set function
 
 _constraint_rules_spec = """
 left:
@@ -91,7 +91,6 @@ bottom_flex_center:
         attribute: (target.y, target.height)
         value: (target.center.y - (value - target.center.y), (value - target.center.y) * 2)
 center_x:
-    type: neutral
     target:
         attribute: target.x
         value: value - target.width / 2
@@ -99,7 +98,6 @@ center_x:
         regular: source.center.x
         container: source.bounds.center().x
 center_y:
-    type: neutral
     target:
         attribute: target.y
         value: value - target.height / 2
@@ -107,7 +105,6 @@ center_y:
         regular: source.center.y
         container: source.bounds.center().y
 center:
-    type: neutral
     target:
         attribute: target.center
         value: value
@@ -115,7 +112,6 @@ center:
         regular: tuple(source.center)
         container: tuple(source.bounds.center())
 width:
-    type: neutral
     target:
         attribute: target.width
         value: value
@@ -123,7 +119,6 @@ width:
         regular: source.width
         container: source.bounds.width - 2 * At.gap
 height:
-    type: neutral
     target:
         attribute: target.height
         value: value
@@ -131,7 +126,6 @@ height:
         regular: source.height
         container: source.bounds.height - 2 * At.gap
 position:
-    type: neutral
     target:
         attribute: target.frame
         value: (value[0], value[1], target.width, target.height)
@@ -139,7 +133,6 @@ position:
         regular: (source.x, source.y)
         container: (source.x, source.y)
 size:
-    type: neutral
     target:
         attribute: target.frame
         value: (target.x, target.y, value[0], value[1])
@@ -147,7 +140,6 @@ size:
         regular: (source.width, source.height)
         container: (source.width, source.height)
 frame:
-    type: neutral
     target:
         attribute: target.frame
         value: value
@@ -155,15 +147,19 @@ frame:
         regular: source.frame
         container: source.frame
 bounds:
-    type: neutral
     target:
         attribute: target.bounds
         value: value
     source:
         regular: source.bounds
         container: source.bounds
+constant:
+    source:
+        regular: source.constant
+function:
+    source:
+        regular: source.func()
 heading:
-    type: neutral
     target:
         attribute: target._at._heading
         value: direction(target, source, value)
@@ -171,7 +167,6 @@ heading:
         regular: source._at._heading
         container: source._at._heading
 attr:
-    type: neutral
     target:
         attribute: target._custom
         value: value
@@ -219,14 +214,8 @@ class At:
         if force_source:
             for dependent in self.source_for:
                 dependent.on_change(force_source=False)
-    
-    class Constraint:
-        
-        REGULAR, CONTAINER = 'regular', 'container'
-        
-        SAME, DIFFERENT, NEUTRAL = 'same', 'different', 'neutral'
-        
-        TRAILING, LEADING = 'trailing', 'leading'
+                
+    class Anchor:
         
         HORIZONTALS = set('left right center_x width fit_width'.split())
         VERTICALS = set('top bottom center_y height fit_height'.split())
@@ -237,61 +226,139 @@ class At:
             self.modifiers = ''
             self.callable = None
             
-        def set_constraint(self, source_at, source_prop):
-            self.target_at = self.at
-            self.target_prop = self.prop
-            self.source_at = source_at
-            self.source_prop = source_prop
-            #warnings.warn(f'{self.target_prop} <- {self.source_prop}', stacklevel=4)
-            self._check_for_warnings()
+        def get_edge_type(self):
+            return _rules.get(
+                self.prop, _rules['attr']).get(
+                'type', 'neutral')
+                
+        def check_for_warnings(self, source):
+            if self.at.constraint_warnings:
+                source_direction, target_direction = [
+                    'v' if c in self.VERTICALS else '' +
+                    'h' if c in self.HORIZONTALS else ''
+                    for c in (source.prop, self.prop)
+                ]
+                if source_direction != target_direction:
+                    warnings.warn(
+                        ConstraintWarning('Unusual constraint combination'),
+                        stacklevel=5,
+                    )
+            if self.at.superview_warnings:
+                if not self.at.view.superview:
+                    warnings.warn(
+                        ConstraintWarning('Probably missing superview'),
+                        stacklevel=5,
+                    )
+                
+        def remove_previous(self):
+            self.at._remove_constraint(self.prop)
             
-            if self.target_at.view.superview == self.source_at.view:
-                self.type = self.CONTAINER
+        def record_dependency(self, target_prop):
+            self.at.source_for.setdefault(
+                self.target_at, set()
+            ).add(target_prop)
+            
+        def check_for_impossible_combos(self):
+            """
+            Check for too many constraints resulting in an impossible combo
+            """
+            h = set([*self.HORIZONTALS, 'center'])
+            v = set([*self.VERTICALS, 'center'])
+            active = set(self.at.update_gens.keys())
+            horizontals = active.intersection(h)
+            verticals = active.intersection(v)
+            if len(horizontals) > 2:
+                raise ConstraintError(
+                    'Too many horizontal constraints', horizontals)
+            elif len(verticals) > 2:
+                raise ConstraintError(
+                    'Too many vertical constraints', verticals)
+            
+        def start_observing(self):
+            At.observer.observe(self.at.view)
+            
+        def trigger_change()
+            self.at.on_change()
+            
+                
+    class ConstantAnchor(Anchor):
+        
+        def __init__(self, constant):
+            super().__init__(
+                ns(view=self),
+                'constant'
+            )
+            self.constant = constant
+            
+        def record_dependency(self, target_prop):
+            pass
+            
+        def start_observing(self):
+            pass
+            
+        def trigger_change(self):
+            raise NotImplementedError(
+                'Programming error: Constant should never trigger change'
+            )
+            
+    
+    class Constraint:
+        
+        REGULAR, CONTAINER = 'regular', 'container'
+        SAME, DIFFERENT, NEUTRAL = 'same', 'different', 'neutral'
+        TRAILING, LEADING = 'trailing', 'leading'
+        
+        def __init__(self, source, target):
+            self.source = source
+            self.target = target
+            
+            target.check_for_warnings(source)
+            
+            target.remove_previous()
+            source.record_dependency(target.prop)
+            
+            self._set_constraint_gen(source, target)
+            target.check_for_impossible_combos()
+            
+            target.trigger_change()
+            target.start_observing()
+            source.start_observing()
+            
+        def _get_characteristics(self, source, target):
+            if target.at.view.superview == source.at.view:
+                container_type = self.CONTAINER
             else:
-                self.type = self.REGULAR
+                container_type = self.REGULAR
             
-            source_type = _rules.get(self.source_prop, _rules['attr']).get(
-                'type', 'neutral')
-            target_type = _rules.get(self.target_prop, _rules['attr']).get(
-                'type', 'neutral')
+            source_edge_type = source.get_edge_type()
+            target_edge_type = target.get_edge_type()
 
-            self.same = self.SAME if any([
-                source_type == self.NEUTRAL,
-                target_type == self.NEUTRAL,
-                source_type == target_type,
-            ]) else self.DIFFERENT
+            align_type = self.SAME if (
+                source_edge_type == self.NEUTRAL or
+                target_edge_type == self.NEUTRAL or
+                source_edge_type == target_edge_type
+            ) else self.DIFFERENT
             
-            if (self.type == self.CONTAINER and
-            self.NEUTRAL not in (source_type, target_type)):
-                self.same = (
+            if (container_type == self.CONTAINER and
+            self.NEUTRAL not in (source_edge_type, target_edge_type)):
+                align_type = (
                     self.SAME
-                    if self.same == self.DIFFERENT
+                    if align_type == self.DIFFERENT
                     else self.DIFFERENT
                 )
                 
-            self.effective_gap = ''
-            if self.same == self.DIFFERENT:
-                self.effective_gap = (
+            gap = ''
+            if align_type == self.DIFFERENT:
+                gap = (
                     f'+ {At.gap}'
-                    if target_type == self.LEADING
+                    if target_edge_type == self.LEADING
                     else f'- {At.gap}'
                 )              
+                
+            return container_type, gap
             
-        def start_observing(self):
-            self.target_at._remove_constraint(self.target_prop)
-            self.source_at.source_for.setdefault(
-                self.target_at, set()
-            ).add(self.target_prop)
-            
-            self._set_gen()
-            
-            self._check_for_impossible_constraints()
-            
-            self.target_at.on_change()
-            At.observer.observe(self.source_at.view)
-            At.observer.observe(self.target_at.view)
-            
-        def _set_gen(self):
+        def _set_constraint_gen(self, source, target):
+            container_type, gap = self._get_characteristics(source, target)
             
             if self.source_prop in _rules:
                 source_value = _rules[self.source_prop]['source'][self.type]
@@ -343,7 +410,7 @@ class At:
                     prev_value = None
                     prev_bounds = None
                     while True: 
-                        value = ({source_value} {self.effective_gap}) {self.modifiers}
+                        value = ({source_value} {self.effective_gap}) {self.source.modifiers}
 
                         {flex_get}
 
@@ -412,45 +479,10 @@ class At:
                     return pair.pop(), center_prop
                 except KeyError: pass
             return (None, None)
-
-        def _check_for_impossible_constraints(self):
-            """
-            Check for too many constraints resulting in an impossible combo
-            """
-            h = set([*self.HORIZONTALS, 'center'])
-            v = set([*self.VERTICALS, 'center'])
-            active = set(self.target_at.update_gens.keys())
-            horizontals = active.intersection(h)
-            verticals = active.intersection(v)
-            if len(horizontals) > 2:
-                raise ConstraintError(
-                    'Too many horizontal constraints', horizontals)
-            elif len(verticals) > 2:
-                raise ConstraintError(
-                    'Too many vertical constraints', verticals)
-            
-        def _check_for_warnings(self):
-            if self.target_at.constraint_warnings:
-                source_type, target_type = [
-                    'v' if c in self.VERTICALS else '' +
-                    'h' if c in self.HORIZONTALS else ''
-                    for c in (self.source_prop, self.target_prop)
-                ]
-                if source_type != target_type:
-                    warnings.warn(
-                        ConstraintWarning('Unusual constraint combination'),
-                        stacklevel=5,
-                    )
-            if self.target_at.superview_warnings:
-                if not self.target_at.view.superview:
-                    warnings.warn(
-                        ConstraintWarning('Probably missing superview'),
-                        stacklevel=5,
-                    )
             
         def __add__(self, other):
             if callable(other):
-                self.at.callable = other
+                self.callable = other
             else:
                 self.modifiers += f'+ {other}'
             return self
@@ -490,7 +522,6 @@ class At:
             at.heading_adjustment = 0
             at.source_for = {}
             at.update_gens = {}
-            at.callable = None
             at.checking = False
             view._at = at
             return at
@@ -505,18 +536,20 @@ class At:
         return p
 
     def _getter(self, attr_string):
-        return At.Constraint(self, attr_string)
+        return At.Anchor(self, attr_string)
 
-    def _setter(self, attr_string, value):
-        if value is None:
+    def _setter(self, attr_string, source):
+        target = At.Anchor(self, attr_string)
+        if type(source) is At.Anchor:
+            constraint = At.Constraint(source, target)
+            #constraint.set_constraint(value)
+            #constraint.start_observing()
+        elif value is None:
             self._remove_constraint(attr_string)
-        else:
+        else:  # Constant or function
             constraint = At.Constraint(self, attr_string)
-            source_anchor = value
-            constraint.modifiers = source_anchor.modifiers
-            constraint.set_constraint(source_anchor.at, source_anchor.prop)
-            
-            constraint.start_observing()
+            source_prop = 'function' if callable(value) else 'constant'
+            constraint.set_constraint(value, source_prop)
         
     # TODO: Implement removal of achors
     def _remove_constraint(self, attr_string):
