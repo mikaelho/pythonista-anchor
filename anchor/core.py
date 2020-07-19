@@ -3,6 +3,7 @@ import json
 import math
 import re
 import textwrap
+import traceback
 import warnings
 
 from functools import partialmethod, partial
@@ -226,10 +227,68 @@ class At:
             self.modifiers = ''
             self.callable = None
             
+        def __add__(self, other):
+            if callable(other):
+                self.callable = other
+            else:
+                self.modifiers += f'+ {other}'
+            return self
+            
+        def __sub__(self, other):
+            self.modifiers += f'- {other}'
+            return self
+            
+        def __mul__(self, other):
+            self.modifiers += f'* {other}'
+            return self
+            
+        def __truediv__(self, other):
+            self.modifiers += f'/ {other}'
+            return self
+            
+        def __floordiv__(self, other):
+            self.modifiers += f'// {other}'
+            return self
+            
+        def __mod__(self, other):
+            self.modifiers += f'% {other}'
+            return self
+            
+        def __pow__ (self, other, modulo=None):
+            self.modifiers += f'** {other}'
+            return self
+            
         def get_edge_type(self):
             return _rules.get(
                 self.prop, _rules['attr']).get(
                 'type', 'neutral')
+                
+        def get_attribute(self, prop=None):
+            prop = prop or self.prop
+            if prop in _rules:
+                target_attribute = _rules[prop]['target']['attribute']
+            else:
+                target_attribute = _rules['attr']['target']['attribute']
+                target_attribute = target_attribute.replace(
+                    '_custom', prop)
+            return target_attribute
+                
+        def get_source_value(self, container_type):
+            if self.prop in _rules:
+                source_value = _rules[self.prop]['source'][container_type]
+            else:
+                source_value = _rules['attr']['source']['regular']
+                source_value = source_value.replace('_custom', self.prop)
+            return source_value
+            
+        def get_target_value(self, prop=None):
+            prop = prop or self.prop
+            if prop in _rules:
+                target_value = _rules[prop]['target']['value']
+            else:
+                target_value = _rules['attr']['target']['value']
+                target_value = target_value.replace('_custom', prop)
+            return target_value
                 
         def check_for_warnings(self, source):
             if self.at.constraint_warnings:
@@ -253,10 +312,10 @@ class At:
         def remove_previous(self):
             self.at._remove_constraint(self.prop)
             
-        def record_dependency(self, target_prop):
+        def record_dependency(self, target):
             self.at.source_for.setdefault(
-                self.target_at, set()
-            ).add(target_prop)
+                target.at, set()
+            ).add(target.prop)
             
         def check_for_impossible_combos(self):
             """
@@ -277,7 +336,7 @@ class At:
         def start_observing(self):
             At.observer.observe(self.at.view)
             
-        def trigger_change()
+        def trigger_change(self):
             self.at.on_change()
             
                 
@@ -315,16 +374,60 @@ class At:
             target.check_for_warnings(source)
             
             target.remove_previous()
-            source.record_dependency(target.prop)
+            source.record_dependency(target)
             
-            self._set_constraint_gen(source, target)
+            self.set_constraint_gen(source, target)
             target.check_for_impossible_combos()
             
             target.trigger_change()
             target.start_observing()
             source.start_observing()
             
-        def _get_characteristics(self, source, target):
+        def set_constraint_gen(self, source, target):
+            container_type, gap = self.get_characteristics(source, target)
+            
+            source_value = source.get_source_value(container_type)
+            
+            flex_get, flex_set = self.get_flex(target)
+
+            call_callable = self.get_call_str(source)
+
+            update_gen_str = (f'''\
+                # {target.prop}
+                def constraint_runner(source, target):
+
+                    scripts = target.at.update_gens
+                    func = source.callable
+                    source = source.at.view
+                    target = target.at.view
+                        
+                    prev_value = None
+                    prev_bounds = None
+                    while True:
+                        value = ({source_value} {gap}) {source.modifiers}
+
+                        {flex_get}
+
+                        if (target_value != prev_value or 
+                        target.superview.bounds != prev_bounds):
+                            prev_value = target_value
+                            prev_bounds = target.superview.bounds
+                            {call_callable}
+                            {flex_set}
+                            yield True
+                        else:
+                            yield False
+                        
+                target.at.update_gens[target.prop] = \
+                    constraint_runner(source, target)
+                '''
+            )
+            update_gen_str = textwrap.dedent(update_gen_str)
+            #if self.target_prop == 'text':
+            #    print(update_gen_str)
+            exec(update_gen_str)
+            
+        def get_characteristics(self, source, target):
             if target.at.view.superview == source.at.view:
                 container_type = self.CONTAINER
             else:
@@ -357,116 +460,44 @@ class At:
                 
             return container_type, gap
             
-        def _set_constraint_gen(self, source, target):
-            container_type, gap = self._get_characteristics(source, target)
-            
-            if self.source_prop in _rules:
-                source_value = _rules[self.source_prop]['source'][self.type]
-                #source_value = source_value.replace('border_gap', str(At.gap))
-            else:
-                source_value = _rules['attr']['source']['regular']
-                source_value = source_value.replace('_custom', self.source_prop)
-            
-            target_attribute = self.get_target_attribute(self.target_prop)
-            
-            flex_get = f'target_value = {self.get_target_value(self.target_prop)}'
+        def get_flex(self, target):
+            target_attribute = target.get_attribute()
+            flex_get = f'target_value = {target.get_target_value()}'
             flex_set = f'{target_attribute} = target_value'
-            opposite_prop, center_prop = self.get_opposite(self.target_prop)
+            opposite_prop, center_prop = self.get_opposite(target.prop)
             if opposite_prop:
-                flex_prop = self.target_prop + '_flex'
-                flex_center_prop = self.target_prop + '_flex_center'
+                flex_prop = target.prop + '_flex'
+                flex_center_prop = target.prop + '_flex_center'
                 flex_get = f'''
                         center_props = set(('center', '{center_prop}'))
                         if '{opposite_prop}' in scripts:
-                            target_value = ({self.get_target_value(flex_prop)})
+                            target_value = ({target.get_target_value(flex_prop)})
                         elif len(center_props.intersection(set(scripts.keys()))):
-                            target_value = ({self.get_target_value(flex_center_prop)})
+                            target_value = ({target.get_target_value(flex_center_prop)})
                         else:
-                            target_value = {self.get_target_value(self.target_prop)}
+                            target_value = {target.get_target_value()}
                 '''
                 flex_set = f'''
                             if '{opposite_prop}' in scripts:
-                                {self.get_target_attribute(flex_prop)} = target_value
+                                {target.get_attribute(flex_prop)} = target_value
                             elif len(center_props.intersection(set(scripts.keys()))):
-                                {self.get_target_attribute(flex_center_prop)} = target_value
+                                {target.get_attribute(flex_center_prop)} = target_value
                             else: 
                                 {target_attribute} = target_value
                 '''
-
-            func = self.callable or self.source_at.callable
-            call_callable = ''
-            if func:
-                call_str = 'func(target_value)'
-                parameters = inspect.signature(func).parameters
-                if len(parameters) == 2:
-                    call_str = 'func(target_value, target)'
-                if len(parameters) == 3:
-                    call_str = 'func(target_value, target, source)'
-                call_callable = f'target_value = {call_str}'
-
-            update_gen_str = (f'''\
-                # {self.target_prop}
-                def constraint_runner(source, target, scripts, func):
-                    prev_value = None
-                    prev_bounds = None
-                    while True: 
-                        value = ({source_value} {self.effective_gap}) {self.source.modifiers}
-
-                        {flex_get}
-
-                        if (target_value != prev_value or 
-                        target.superview.bounds != prev_bounds):
-                            prev_value = target_value
-                            prev_bounds = target.superview.bounds
-                            {call_callable}
-                            {flex_set}
-                            yield True
-                        else:
-                            yield False
-                        
-                self.target_at.update_gens[self.target_prop] = \
-                    constraint_runner(
-                        self.source_at.view, 
-                        self.target_at.view,
-                        self.target_at.update_gens,
-                        self.callable or self.source_at.callable)
-                '''
-            )
-            update_gen_str = textwrap.dedent(update_gen_str)
-            #if self.target_prop == 'text':
-            #    print(update_gen_str)
-            exec(update_gen_str)
+            return flex_get, flex_set
             
-        def get_choice_code(self, code):
-            target_prop = self.target_prop
-            opposite_prop = self.get_opposite(target_prop)
-            
-            if opposite_prop:
-                flex_prop = f'{target_prop}_flex'
-                return f'''
-                            if '{opposite_prop}' in scripts: {self.get_code(flex_prop)}
-                            else: {self.get_code(target_prop)}'''
-            else:
-                return f'; {self.get_code(target_prop)}'
-            
-        def get_target_value(self, target_prop):
-            if target_prop in _rules:
-                target_value = _rules[target_prop]['target']['value']
-            else:
-                target_value = _rules['attr']['target']['value']
-                target_value = target_value.replace('_custom', target_prop)
-            return target_value
-            
-            #return f'''{target_attribute} = {target_value}'''
-            
-        def get_target_attribute(self, target_prop):
-            if target_prop in _rules:
-                target_attribute = _rules[target_prop]['target']['attribute']
-            else:
-                target_attribute = _rules['attr']['target']['attribute']
-                target_attribute = target_attribute.replace(
-                    '_custom', target_prop)
-            return target_attribute
+        def get_call_str(self, source):
+            if not source.callable:
+                return ''
+                
+            call_strs = {
+                1: 'func(target_value)',
+                2: 'func(target_value, target)',
+                3: 'func(target_value, target, source)',
+            }
+            parameter_count = len(inspect.signature(source.callable).parameters)
+            return f'target_value = {call_strs[parameter_count]}'
             
         def get_opposite(self, prop):
             opposites = (
@@ -480,37 +511,6 @@ class At:
                 except KeyError: pass
             return (None, None)
             
-        def __add__(self, other):
-            if callable(other):
-                self.callable = other
-            else:
-                self.modifiers += f'+ {other}'
-            return self
-            
-        def __sub__(self, other):
-            self.modifiers += f'- {other}'
-            return self
-            
-        def __mul__(self, other):
-            self.modifiers += f'* {other}'
-            return self
-            
-        def __truediv__(self, other):
-            self.modifiers += f'/ {other}'
-            return self
-            
-        def __floordiv__(self, other):
-            self.modifiers += f'// {other}'
-            return self
-            
-        def __mod__(self, other):
-            self.modifiers += f'% {other}'
-            return self
-            
-        def __pow__ (self, other, modulo=None):
-            self.modifiers += f'** {other}'
-            return self
-    
     
     def __new__(cls, view):
         try:
