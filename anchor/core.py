@@ -15,8 +15,7 @@ import  objc_util
 
 from anchor.observer import NSKeyValueObserving
 
-# TODO: Set constant
-# TODO: Set function
+# TODO: Greater or less than
 
 _constraint_rules_spec = """
 left:
@@ -156,10 +155,10 @@ bounds:
         container: source.bounds
 constant:
     source:
-        regular: source.constant
+        regular: source.data
 function:
     source:
-        regular: source.func()
+        regular: source.data()
 heading:
     target:
         attribute: target._at._heading
@@ -204,8 +203,10 @@ class At:
             return
         self.checking = True
         changed = True
-        while changed:
+        counter = 0
+        while changed and counter < 5:
             changed = False
+            counter += 1
             for key, gen in self.update_gens.items():
                 gen_changed = next(gen)
                 changed = changed or gen_changed
@@ -291,7 +292,9 @@ class At:
             return target_value
                 
         def check_for_warnings(self, source):
-            if self.at.constraint_warnings:
+            if self.at.constraint_warnings and source.prop not in (
+                'constant', 'function'
+            ):
                 source_direction, target_direction = [
                     'v' if c in self.VERTICALS else '' +
                     'h' if c in self.HORIZONTALS else ''
@@ -342,12 +345,13 @@ class At:
                 
     class ConstantAnchor(Anchor):
         
-        def __init__(self, constant):
+        def __init__(self, source_data):
+            prop = 'function' if callable(source_data) else 'constant'
             super().__init__(
                 ns(view=self),
-                'constant'
+                prop
             )
-            self.constant = constant
+            self.data = source_data
             
         def record_dependency(self, target_prop):
             pass
@@ -544,12 +548,11 @@ class At:
             constraint = At.Constraint(source, target)
             #constraint.set_constraint(value)
             #constraint.start_observing()
-        elif value is None:
+        elif source is None:
             self._remove_constraint(attr_string)
         else:  # Constant or function
-            constraint = At.Constraint(self, attr_string)
-            source_prop = 'function' if callable(value) else 'constant'
-            constraint.set_constraint(value, source_prop)
+            source = At.ConstantAnchor(source)
+            constraint = At.Constraint(source, target)
         
     # TODO: Implement removal of achors
     def _remove_constraint(self, attr_string):

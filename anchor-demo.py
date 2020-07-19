@@ -1,4 +1,5 @@
 import math
+import random
 import time
 
 import ui
@@ -15,10 +16,10 @@ root = SafeAreaView(
 )
 
 main_content = ui.View(
-    #frame=root.bounds, flex='WH',
+    frame=root.bounds, flex='WH',
 )
-#root.add_subview(main_content)
-dock(root).all(main_content)
+root.add_subview(main_content)
+#dock(root).all(main_content)
 
 def style(*views):
     for v in views:
@@ -99,18 +100,25 @@ def make_label(text):
         
 #  ----- Sidebar & menu button
 
-sidebar = style(ui.View(width=200))
-main_content.add_subview(sidebar)
+
+sidebar = style(ui.View(width=300))
+root.add_subview(sidebar)
 at(sidebar).top = at(main_content).top
 at(sidebar).bottom = at(main_content).bottom
 at(sidebar).right = at(main_content).left
 
-menu_button = size_to_fit(style(ui.Button(image=ui.Image('iow:ios7_drag_32'))))
+menu_button = size_to_fit(style(ui.Button(
+    image=ui.Image('iow:ios7_drag_32'))))
 menu_button.width = menu_button.height
 dock(main_content).top_left(menu_button, At.TIGHT)
 
-#def open_and_close(sender):
-#    scripter.x(main_content)
+def open_and_close(sender):
+    if main_content.x == 0:
+        main_content.x = -sidebar.x
+    else:
+        main_content.x = 0
+        
+menu_button.action = open_and_close
 
 #  ----- At & flex
 
@@ -121,7 +129,8 @@ at(vertical_bar).center_x = at(at_area).width / 5
 
 align(at_area).center_y(vertical_bar)
 #at(vertical_bar).height = at(at_area).height * 0.75
-at(vertical_bar).top = at(at_area).height * 0.1
+at(vertical_bar).top = 20
+attr(vertical_bar).border_color = lambda: (random.random(),) * 3
 
 fix_left = make_label('fix left')
 at_area.add_subview(fix_left)
@@ -262,9 +271,9 @@ if show_markers:
     at(mr).right = at(content_area).right
     at(mr).bottom = at(content_area).bottom - At.TIGHT
     
-    ms = create_marker(root)
+    ms = create_marker(main_content)
     at(ms).center_x = at(button_area).center_x * 1.5
-    at(ms).bottom = at(button_area).bottom - At.TIGHT
+    at(ms).bottom = at(button_area).bottom
 
 root.present('fullscreen', 
     animated=False,
