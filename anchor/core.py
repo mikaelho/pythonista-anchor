@@ -207,15 +207,15 @@ class At:
         while changed and counter < 5:
             changed = False
             counter += 1
-            for key, gen in self.update_gens.items():
-                gen_changed = next(gen)
-                changed = changed or gen_changed
+            for constraint in self.target_for.values():
+                value_changed = next(constraint.runner)
+                changed = changed or value_changed
             if changed:
                 force_source = True
         self.checking = False
         if force_source:
-            for dependent in self.source_for:
-                dependent.on_change(force_source=False)
+            for constraint in self.source_for:
+                constraint.target.at.on_change(force_source=False)
                 
     class Anchor:
         
@@ -312,13 +312,14 @@ class At:
                         stacklevel=5,
                     )
                 
-        def remove_previous(self):
-            self.at._remove_constraint(self.prop)
-            
-        def record_dependency(self, target):
-            self.at.source_for.setdefault(
-                target.at, set()
-            ).add(target.prop)
+        def record(self, constraint):
+            if constraint.source == self:
+                self.at.source_for.add(constraint)
+            elif constraint.target == self:
+                self.at._remove_constraint(self.prop)
+                self.at.target_for[self.prop] = constraint
+            else:
+                raise ValueError('Disconnected constraint')
             
         def check_for_impossible_combos(self):
             """
@@ -326,7 +327,7 @@ class At:
             """
             h = set([*self.HORIZONTALS, 'center'])
             v = set([*self.VERTICALS, 'center'])
-            active = set(self.at.update_gens.keys())
+            active = set(self.at.target_for.keys())
             horizontals = active.intersection(h)
             verticals = active.intersection(v)
             if len(horizontals) > 2:
@@ -353,7 +354,7 @@ class At:
             )
             self.data = source_data
             
-        def record_dependency(self, target_prop):
+        def record(self, constraint):
             pass
             
         def start_observing(self):
@@ -377,10 +378,10 @@ class At:
             
             target.check_for_warnings(source)
             
-            target.remove_previous()
-            source.record_dependency(target)
-            
             self.set_constraint_gen(source, target)
+            
+            target.record(self)
+            source.record(self)
             target.check_for_impossible_combos()
             
             target.trigger_change()
@@ -400,7 +401,7 @@ class At:
                 # {target.prop}
                 def constraint_runner(source, target):
 
-                    scripts = target.at.update_gens
+                    scripts = target.at.target_for
                     func = source.callable
                     source = source.at.view
                     target = target.at.view
@@ -422,8 +423,7 @@ class At:
                         else:
                             yield False
                         
-                target.at.update_gens[target.prop] = \
-                    constraint_runner(source, target)
+                self.runner = constraint_runner(source, target)
                 '''
             )
             update_gen_str = textwrap.dedent(update_gen_str)
@@ -524,8 +524,8 @@ class At:
             at.view = view
             at.__heading = 0
             at.heading_adjustment = 0
-            at.source_for = {}
-            at.update_gens = {}
+            at.source_for = set()
+            at.target_for = {}
             at.checking = False
             view._at = at
             return at
@@ -554,12 +554,19 @@ class At:
             source = At.ConstantAnchor(source)
             constraint = At.Constraint(source, target)
         
-    # TODO: Implement removal of achors
     def _remove_constraint(self, attr_string):
-        len_before = len(self.update_gens)
-        gen = self.update_gens.pop(attr_string, None)
-        if len_before and len(self.update_gens) == 0:
-            self.observer.stop_observing(self.view)
+        target_len = len(self.target_for)
+        constraint = self.target_for.pop(attr_string, None)
+        if target_len and not len(self.target_for) and not len(self.source_for):
+            At.observer.stop_observing(self.view)
+        if constraint:
+            source_at = constraint.source.at
+            source_len = len(source_at.source_for)
+            source_at.source_for.discard(constraint)
+            if (source_len and
+            not len(source_at.source_for) and 
+            not len(source_at.target_for)):
+                At.observer.stop_observing(source_at.view)
         
     @property
     def _heading(self):

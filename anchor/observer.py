@@ -27,13 +27,13 @@ class NSKeyValueObserving(objc_plus.ObjCDelegate):
                 
     def stop_observing(self, target):
         objc_target = target.objc_instance
-        if objc_target not in self.targets: return
-        del self.targets[objc_target]
-        for key in self.observeattrs:
-            objc_target.layer().\
-            removeObserver_forKeyPath_(self, key)
+        target_view = self.targets.pop(objc_target, None)
+        if target_view:
+            for key in self.observeattrs:
+                objc_target.layer().\
+                removeObserver_forKeyPath_(self, key)
             
-    def stop(self):
+    def stop_all(self):
         for target in list(self.targets.values()):
             self.stop_observing(target)
     
