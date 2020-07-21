@@ -15,7 +15,10 @@ import  objc_util
 
 from anchor.observer import NSKeyValueObserving
 
-# TODO: Greater or less than
+# TODO: Greater or less than?
+# TODO: Align API target/source
+# TODO: Priorities?
+# TODO: Rules to anchor
 
 _constraint_rules_spec = """
 left:
@@ -696,13 +699,20 @@ class Dock:
         'C': ('center', 0),
     }
     
-    def __init__(self, superview):
-        self.superview = superview
+    def __init__(self, view):
+        self.view = view
         
-    def _dock(self, directions, view, modifier=0):
-        self.superview.add_subview(view)
+    def _dock(self, directions, superview, modifier=0):
+        view = self.view
+        superview.add_subview(view)
+        print(
+            'ADD',
+            view.name if view.name else view,
+            'TO',
+            superview.name if superview.name else view
+        )
         v = at(view)
-        sv = at(self.superview)
+        sv = at(superview)
         for direction in directions:
             prop, sign = self.direction_map[direction]
             if prop != 'center':
@@ -766,8 +776,8 @@ class Dock:
         align(self.view).center_y(other)
         
         
-def dock(superview) -> Dock:
-    return Dock(superview)
+def dock(view) -> Dock:
+    return Dock(view)
     
     
 class Align:
@@ -817,7 +827,7 @@ class Fill:
     *views):
         assert len(views) > 0, 'Give at least one view to fill with'
         first = views[0]
-        getattr(dock(self.superview), corner)(first)
+        getattr(dock(first), corner)(self.superview)
         gaps = At.gaps_for(self.count)
         per_count = math.ceil(len(views)/self.count)
         per_gaps = At.gaps_for(per_count)
@@ -872,7 +882,7 @@ class Flow:
     def _flow(self, corner, size, func, *views):
         assert len(views) > 0, 'Give at least one view for the flow'
         first = views[0]
-        getattr(dock(self.superview), corner)(first)
+        getattr(dock(first), corner)(self.superview)
         for i, view in enumerate(views[1:]):
             self.superview.add_subview(view)
             setattr(at(view), size, 

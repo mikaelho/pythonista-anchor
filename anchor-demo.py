@@ -52,22 +52,23 @@ def create_area(title):
         #number_of_lines=0,
         font=('Arial Rounded MT Bold', 12),
     )))
-    dock(area).top_right(label, At.TIGHT)
+    dock(label).top_right(area, At.TIGHT)
     return area
 
 # ------ Button flow
 
-button_area = style(ui.View())
-dock(main_content).bottom(button_area, At.TIGHT)
+button_area = style(ui.View(name='button_area'))
+dock(button_area).bottom(main_content, At.TIGHT)
+print('DOCKED')
 button_label = style_label(ui.Label(
     text='FLOW',
     font=('Arial Rounded MT Bold', 12),
 ))
 button_label.size_to_fit()
 ghost_area = ui.View()
-root.add_subview(ghost_area)
+main_content.add_subview(ghost_area)
 at(ghost_area).frame = at(button_area).frame
-dock(ghost_area).bottom_right(button_label)
+dock(button_label).bottom_right(ghost_area)
 buttons = [
     size_to_fit(style2(ui.Button(
         title=f'button {i + 1}')))
@@ -77,7 +78,7 @@ flow(button_area).from_top_left(*buttons)
 at(button_area).height = at(button_area).fit_height
 
 content_area = style(ui.View(name='content_area'))
-dock(main_content).top(content_area, At.TIGHT)
+dock(content_area).top(main_content, At.TIGHT)
 
 at(content_area).bottom = at(button_area).top - At.TIGHT
 
@@ -110,7 +111,7 @@ at(sidebar).right = at(main_content).left
 menu_button = size_to_fit(style(ui.Button(
     image=ui.Image('iow:ios7_drag_32'))))
 menu_button.width = menu_button.height
-dock(main_content).top_left(menu_button, At.TIGHT)
+dock(menu_button).top_left(main_content, At.TIGHT)
 
 def open_and_close(sender):
     if main_content.x == 0:
@@ -187,11 +188,11 @@ attr(heading_label).text = at(pointer).heading + (
 
 #  ----- Dock
 
-dock(dock_area).top_center(make_label('top\ncenter'))
-dock(dock_area).left(make_label('left'))
-dock(dock_area).bottom_right(make_label('bottom\nright'))
+dock(make_label('top\ncenter')).top_center(dock_area)
+dock(make_label('left')).left(dock_area)
+dock(make_label('bottom\nright')).bottom_right(dock_area)
 center_label = make_label('center')
-dock(dock_area).center(center_label)
+dock(center_label).center(dock_area)
 #dock(center_label).above(make_label('below'))
 
 #  ----- Align
