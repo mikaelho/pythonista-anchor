@@ -59,7 +59,6 @@ def create_area(title):
 
 button_area = style(ui.View(name='button_area'))
 dock(button_area).bottom(main_content, At.TIGHT)
-print('DOCKED')
 button_label = style_label(ui.Label(
     text='FLOW',
     font=('Arial Rounded MT Bold', 12),
@@ -128,7 +127,7 @@ vertical_bar = style(ui.View(name='vbar',
 at_area.add_subview(vertical_bar)
 at(vertical_bar).center_x = at(at_area).width / 5
 
-align(at_area).center_y(vertical_bar)
+align(vertical_bar).center_y(at_area)
 #at(vertical_bar).height = at(at_area).height * 0.75
 at(vertical_bar).top = 20
 attr(vertical_bar).border_color = lambda: (random.random(),) * 3
@@ -136,13 +135,13 @@ attr(vertical_bar).border_color = lambda: (random.random(),) * 3
 fix_left = make_label('fix left')
 at_area.add_subview(fix_left)
 at(fix_left).left = at(vertical_bar).right
-align(vertical_bar, -30).center_y(fix_left)
+align(fix_left).center_y(vertical_bar, -30)
 
 flex = make_label('fix left and right')
 at_area.add_subview(flex)
 at(flex).left = at(vertical_bar).right + At.TIGHT
 at(flex).right = at(at_area).right
-align(vertical_bar, +30).center_y(flex)
+align(flex).center_y(vertical_bar, +30)
 
 # ------ Heading & custom
 
@@ -169,7 +168,7 @@ pointer.text_color = accent_color
 pointer.background_color = 'transparent'
 pointer.font = (pointer.font[0], 40)
 
-align(pointer_area).center(pointer)
+align(pointer).center(pointer_area)
 at(pointer).heading = at(target).center
 
 heading_label = ui.Label(text='000°',
@@ -180,7 +179,7 @@ heading_label = ui.Label(text='000°',
 heading_label.size_to_fit()
 pointer_area.add_subview(heading_label)
 at(heading_label).center_y = at(pointer).center_y - 22
-align(pointer).center_x(heading_label)
+align(heading_label).center_x(pointer)
 
 attr(heading_label).text = at(pointer).heading + (
     lambda angle: f"{int(math.degrees(angle))%360:03}°"
@@ -207,7 +206,7 @@ l3 = make_label('3')
 align_area.add_subview(l3)
 at(l3).center_x = at(align_area).center_x / 2 * 3
 
-align(align_area).center_y(l1, l2, l3)
+align(l1, l2, l3).center_y(align_area)
     
 
 # ------ Markers
@@ -233,15 +232,15 @@ if show_markers:
         return marker
         
     m1 = create_marker(at_area)
-    align(fix_left).center_y(m1)
+    align(m1).center_y(fix_left)
     at(m1).left = at(fix_left).right
     
     m2 = create_marker(at_area)
-    align(flex).left(m2)
+    align(m2).left(flex)
     at(m2).center_y = at(flex).top - At.gap
     
     m3 = create_marker(at_area)
-    align(flex).right(m3)
+    align(m3).right(flex)
     at(m3).center_y = at(flex).top - At.gap
     
     m4 = create_marker(pointer_area)
@@ -249,7 +248,7 @@ if show_markers:
     at(m4).left = at(pointer).right + 3*At.TIGHT
     
     m5 = create_marker(pointer_area)
-    align(heading_label).center_y(m5)
+    align(m5).center_y(heading_label)
     at(m5).left = at(heading_label).right
     
     m6 = create_marker(dock_area)
@@ -257,7 +256,7 @@ if show_markers:
     at(m6).center_y = at(dock_area).center_y / 2
     
     m7 = create_marker(align_area)
-    align(align_area).center_x(m7)
+    align(m7).center_x(align_area)
     at(m7).top = at(l2).bottom
     
     mc = create_marker(content_area)
@@ -265,7 +264,7 @@ if show_markers:
     
     mb = create_marker(button_area)
     last_button = buttons[-1]
-    align(last_button).center_y(mb)
+    align(mb).center_y(last_button)
     at(mb).left = at(last_button).right
     
     mr = create_marker(content_area)

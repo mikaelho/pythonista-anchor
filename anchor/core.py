@@ -705,12 +705,6 @@ class Dock:
     def _dock(self, directions, superview, modifier=0):
         view = self.view
         superview.add_subview(view)
-        print(
-            'ADD',
-            view.name if view.name else view,
-            'TO',
-            superview.name if superview.name else view
-        )
         v = at(view)
         sv = at(superview)
         for direction in directions:
@@ -762,10 +756,10 @@ class Dock:
         
     def below(self, other):
         at(self.view).top = at(other).bottom
-        at(other).center_x = at(self.view).center_x
-        at(other).width = at(self.view).width
+        at(self.view).center_x = at(other).center_x
+        at(self.view).width = at(other).width
         #align(self.view).center_x(other)
-        align(self.view).width(other)
+        #align(self.view).width(other)
         
     def to_the_left(self, other):
         at(self.view).right = at(other).left
@@ -784,18 +778,18 @@ class Align:
     
     modifiable = 'left right top bottom center_x center_y width height heading'
     
-    def __init__(self, view, modifier=0):
-        self.anchor_at = at(view)
-        self.modifier = modifier
+    def __init__(self, *others):
+        self.others = others
         
-    def _align(self, prop, *others):
+    def _align(self, prop, view, modifier=0):
+        anchor_at = at(view)
         use_modifier = prop in self.modifiable.split()
-        for other in others:
+        for other in self.others:
             if use_modifier:
                 setattr(at(other), prop, 
-                    getattr(self.anchor_at, prop) + self.modifier)
+                    getattr(anchor_at, prop) + modifier)
             else:
-                setattr(at(other), prop, getattr(self.anchor_at, prop))
+                setattr(at(other), prop, getattr(anchor_at, prop))
     
     left = partialmethod(_align, 'left')
     right = partialmethod(_align, 'right')
@@ -812,8 +806,8 @@ class Align:
     bounds = partialmethod(_align, 'bounds')
     heading = partialmethod(_align, 'heading')
     
-def align(view, modifier=0):
-    return Align(view, modifier)
+def align(*others):
+    return Align(*others)
     
     
 class Fill:
