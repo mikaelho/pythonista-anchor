@@ -15,10 +15,9 @@ import  objc_util
 
 from anchor.observer import NSKeyValueObserving
 
-# TODO: Greater or less than?
 # TODO: Align API target/source
+# TODO: Greater or less than?
 # TODO: Priorities?
-# TODO: Rules to anchor
 
 _constraint_rules_spec = """
 left:
@@ -263,34 +262,34 @@ class At:
             return self
             
         def get_edge_type(self):
-            return _rules.get(
-                self.prop, _rules['attr']).get(
+            return At.Anchor._rules.get(
+                self.prop, At.Anchor._rules['attr']).get(
                 'type', 'neutral')
                 
         def get_attribute(self, prop=None):
             prop = prop or self.prop
-            if prop in _rules:
-                target_attribute = _rules[prop]['target']['attribute']
+            if prop in At.Anchor._rules:
+                target_attribute = At.Anchor._rules[prop]['target']['attribute']
             else:
-                target_attribute = _rules['attr']['target']['attribute']
+                target_attribute = At.Anchor._rules['attr']['target']['attribute']
                 target_attribute = target_attribute.replace(
                     '_custom', prop)
             return target_attribute
                 
         def get_source_value(self, container_type):
-            if self.prop in _rules:
-                source_value = _rules[self.prop]['source'][container_type]
+            if self.prop in At.Anchor._rules:
+                source_value = At.Anchor._rules[self.prop]['source'][container_type]
             else:
-                source_value = _rules['attr']['source']['regular']
+                source_value = At.Anchor._rules['attr']['source']['regular']
                 source_value = source_value.replace('_custom', self.prop)
             return source_value
             
         def get_target_value(self, prop=None):
             prop = prop or self.prop
-            if prop in _rules:
-                target_value = _rules[prop]['target']['value']
+            if prop in At.Anchor._rules:
+                target_value = At.Anchor._rules[prop]['target']['value']
             else:
-                target_value = _rules['attr']['target']['value']
+                target_value = At.Anchor._rules['attr']['target']['value']
                 target_value = target_value.replace('_custom', prop)
             return target_value
                 
@@ -345,6 +344,36 @@ class At:
             
         def trigger_change(self):
             self.at.on_change()
+            
+        def _parse_rules(rules):    
+            rule_dict = dict()
+            dicts = [rule_dict]
+            spaces = re.compile(' *')
+            for i, line in enumerate(rules.splitlines()):
+                i += 11  # Used to match error line number to my file
+                if line.strip() == '': continue
+                indent = len(spaces.match(line).group())
+                if indent % 4 != 0:
+                    raise RuntimeError(f'Broken indent on line {i}')
+                indent = indent // 4 + 1
+                if indent > len(dicts):
+                    raise RuntimeError(f'Extra indentation on line {i}')
+                dicts = dicts[:indent]
+                line = line.strip()
+                if line.endswith(':'):
+                    key = line[:-1].strip()
+                    new_dict = dict()
+                    dicts[-1][key] = new_dict
+                    dicts.append(new_dict)
+                else:
+                    try:
+                        key, content = line.split(':')
+                        dicts[-1][key.strip()] = content.strip()
+                    except Exception as error:
+                        raise RuntimeError(f'Cannot parse line {i}', error)
+            return rule_dict
+            
+        _rules = _parse_rules(_constraint_rules_spec)
             
                 
     class ConstantAnchor(Anchor):
@@ -646,36 +675,6 @@ def subview_bounds(view):
         bounds = ui.Rect(0, 0, 0, 0)
     return bounds.inset(-At.gap, -At.gap)
 
-def _parse_rules(rules):    
-    rule_dict = dict()
-    dicts = [rule_dict]
-    spaces = re.compile(' *')
-    for i, line in enumerate(rules.splitlines()):
-        i += 11  # Used to match error line number to my file
-        if line.strip() == '': continue
-        indent = len(spaces.match(line).group())
-        if indent % 4 != 0:
-            raise RuntimeError(f'Broken indent on line {i}')
-        indent = indent // 4 + 1
-        if indent > len(dicts):
-            raise RuntimeError(f'Extra indentation on line {i}')
-        dicts = dicts[:indent]
-        line = line.strip()
-        if line.endswith(':'):
-            key = line[:-1].strip()
-            new_dict = dict()
-            dicts[-1][key] = new_dict
-            dicts.append(new_dict)
-        else:
-            try:
-                key, content = line.split(':')
-                dicts[-1][key.strip()] = content.strip()
-            except Exception as error:
-                raise RuntimeError(f'Cannot parse line {i}', error)
-    return rule_dict
-    
-_rules = _parse_rules(_constraint_rules_spec)
-
 
 class ConstraintError(RuntimeError):
     """
@@ -869,16 +868,17 @@ def fill(superview, count=1):
 
 class Flow:
 
-    def __init__(self, superview):
-        self.superview = superview
-        self.super_at = at(superview)
+    def __init__(self, *views):
+        self.views = views
     
-    def _flow(self, corner, size, func, *views):
-        assert len(views) > 0, 'Give at least one view for the flow'
+    def _flow(self, corner, size, func, superview):
+        assert len(self.views) > 0, 'Give at least one view for the flow'
+        views = self.views
+        super_at = at(superview)
         first = views[0]
-        getattr(dock(first), corner)(self.superview)
+        getattr(dock(first), corner)(superview)
         for i, view in enumerate(views[1:]):
-            self.superview.add_subview(view)
+            superview.add_subview(view)
             setattr(at(view), size, 
                 getattr(at(views[i]), size))
             at(view).frame =  at(views[i]).frame + func
@@ -933,8 +933,8 @@ class Flow:
     from_right_up = partialmethod(_flow, 
         'bottom_right', 'width', partial(_from_bottom, -1))
 
-def flow(superview):
-    return Flow(superview)
+def flow(*views):
+    return Flow(*views)
     
 def size_to_fit(view):
     view.size_to_fit()

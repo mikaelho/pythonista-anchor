@@ -73,7 +73,7 @@ buttons = [
         title=f'button {i + 1}')))
     for i in range(6)
 ]
-flow(button_area).from_top_left(*buttons)
+flow(*buttons).from_top_left(button_area)
 at(button_area).height = at(button_area).fit_height
 
 content_area = style(ui.View(name='content_area'))
