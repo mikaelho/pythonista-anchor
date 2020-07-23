@@ -11,9 +11,9 @@ from itertools import accumulate
 from types import SimpleNamespace as ns
 
 import ui
-import  objc_util
+import objc_util
 
-from anchor.observer import NSKeyValueObserving
+from anchors.observer import NSKeyValueObserving
 
 # TODO: lte, gte, in_range, in_range_angle, in_rect
 # TODO: Greater or less than?

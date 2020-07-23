@@ -1,6 +1,6 @@
 import ui
 
-import anchor.observer as nsobserver
+import anchors.observer as nsobserver
 
 v = ui.View()
 

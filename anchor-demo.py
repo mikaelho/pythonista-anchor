@@ -1,4 +1,5 @@
 import math
+import inspect
 import random
 import time
 
@@ -19,7 +20,6 @@ main_content = ui.View(
     frame=root.bounds, flex='WH',
 )
 root.add_subview(main_content)
-#dock(root).all(main_content)
 
 def style(*views):
     for v in views:
