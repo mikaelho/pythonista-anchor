@@ -16,9 +16,9 @@ This version replaces the `update` method with the [KVO](https://developer.apple
 
 Examples in this section assume that you have imported anchors:
 
-    ```
-    from anchors import *
-    ```
+```
+from anchors import *
+```
 
 To cover the main anchor features, please refer to this picture with handy numbering:
 
