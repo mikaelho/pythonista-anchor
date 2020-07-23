@@ -15,7 +15,6 @@ import  objc_util
 
 from anchor.observer import NSKeyValueObserving
 
-# TODO: Align API target/source
 # TODO: Greater or less than?
 # TODO: Priorities?
 
@@ -811,36 +810,37 @@ def align(*others):
     
 class Fill:
     
-    def __init__(self, superview, count=1):
-        self.superview = superview
-        self.super_at = at(superview)
-        self.count = count
+    def __init__(self, *views):
+        self.views = views
         
-    def _fill(self, corner, attr, opposite, center, side, other_side, size, other_size,
-    *views):
+    def _fill(self,
+    corner, attr, opposite, center, side, other_side, size, other_size,
+    superview, count=1):
+        views = self.views
         assert len(views) > 0, 'Give at least one view to fill with'
         first = views[0]
-        getattr(dock(first), corner)(self.superview)
-        gaps = At.gaps_for(self.count)
-        per_count = math.ceil(len(views)/self.count)
+        getattr(dock(first), corner)(superview)
+        gaps = At.gaps_for(count)
+        per_count = math.ceil(len(views)/count)
         per_gaps = At.gaps_for(per_count)
+        super_at = at(superview)
         for i, view in enumerate(views[1:]):
-            self.superview.add_subview(view)
+            superview.add_subview(view)
             if (i + 1) % per_count != 0:
                 setattr(at(view), attr, getattr(at(views[i]), opposite))
                 setattr(at(view), center, getattr(at(views[i]), center))
             else:
-                setattr(at(view), attr, getattr(self.super_at, attr))
+                setattr(at(view), attr, getattr(super_at, attr))
                 setattr(at(view), side, getattr(at(views[i]), other_side))
         for view in views:
             setattr(at(view), size, 
-                getattr(self.super_at, size) + (
+                getattr(super_at, size) + (
                     lambda v: v / per_count - per_gaps
                 )
             )
             setattr(at(view), other_size, 
-                getattr(self.super_at, other_size) + (
-                    lambda v: v / self.count - gaps
+                getattr(super_at, other_size) + (
+                    lambda v: v / count - gaps
                 )
             )
             
@@ -862,8 +862,8 @@ class Fill:
     'width', 'height')
     
     
-def fill(superview, count=1):
-    return Fill(superview, count)
+def fill_with(*views):
+    return Fill(*views)
 
 
 class Flow:

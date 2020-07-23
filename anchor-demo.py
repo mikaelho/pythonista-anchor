@@ -86,12 +86,12 @@ pointer_area = create_area('heading, custom, func')
 dock_area = create_area('dock')
 align_area = create_area('align')
 
-fill(content_area, 2).from_top(
+fill_with(
     at_area,
     dock_area,
     pointer_area,
     align_area,
-)
+).from_top(content_area, 2)
 
 def make_label(text):
     return size_to_fit(style2(ui.Label(
