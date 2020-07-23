@@ -4,7 +4,7 @@ import time
 
 import ui
 
-from anchor import *
+from anchors import *
 import scripter
 
 accent_color = '#cae8ff'
