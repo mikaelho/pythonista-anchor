@@ -15,6 +15,7 @@ import  objc_util
 
 from anchor.observer import NSKeyValueObserving
 
+# TODO: lte, gte, in_range, in_range_angle, in_rect
 # TODO: Greater or less than?
 # TODO: Priorities?
 
