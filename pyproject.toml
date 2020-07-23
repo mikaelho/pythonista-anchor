@@ -7,4 +7,9 @@ module = "anchors"
 author = "Mikael Honkala"
 author-email = "mikael.honkala@gmail.com"
 home-page = "https://github.com/mikaelho/pythonista-anchor"
-
+dist-name = "pythonista-anchors"
+description-file = "README.md"
+license = "TheUnlicense"
+classifiers = [
+    "Operating System :: iOS"
+]
