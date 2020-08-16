@@ -1,22 +1,12 @@
 import ui
 
-import anchors.observer as nsobserver
+from anchors.observer import on_change
 
-v = ui.View()
-
-class Observer:
-    
-    def __init__(self, view):
-        self.view = view
-        
-    def on_change(self):
-        self.view.mirror.center = self.view.center + (0, 200)
 
 class Mover(ui.View):
     
-    def __init__(self, mirror, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.mirror = mirror
         self.add_subview(
             ui.Label(
                 text='Move me',
@@ -26,26 +16,29 @@ class Mover(ui.View):
                 flex='RTBL',
             )
         )
-        self.observer = Observer(self)
     
     def touch_moved(self, t):
         self.center += t.location - t.prev_location
+
+
+v = ui.View()
+
+mover = Mover(
+    background_color='darkred',
+    center=v.bounds.center(), flex='RLTB',
+)
 
 mirror = ui.View(
     background_color='lightgrey'
 )
 
-mover = Mover(mirror,
-    background_color='darkred',
-    flex='RLTB',
-)
-
-observer = nsobserver.NSKeyValueObserving()
-observer.observe(mover)
-
 v.add_subview(mover)
 v.add_subview(mirror)
 
-mover.center = v.bounds.center()
+def move_mirror(sender):
+    mirror.center = sender.center + (0, 200)
+
+on_change(mover, move_mirror)
     
 v.present('fullscreen', animated=False)
+

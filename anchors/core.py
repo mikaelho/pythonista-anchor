@@ -13,7 +13,7 @@ from types import SimpleNamespace as ns
 import ui
 import objc_util
 
-from anchors.observer import NSKeyValueObserving
+from anchors.observer import on_change, remove_on_change
 
 # TODO: lte, gte, in_range, in_range_angle, in_rect
 # TODO: Greater or less than?
@@ -188,7 +188,7 @@ fit_height:
 
 class At:
     
-    observer = NSKeyValueObserving('_at')
+    #observer = NSKeyValueObserving('_at')
     
     gap = 8  # Apple Standard gap
     TIGHT = -gap
@@ -340,7 +340,7 @@ class At:
                     'Too many vertical constraints', verticals)
             
         def start_observing(self):
-            At.observer.observe(self.at.view)
+            on_change(self.at.view, self.at.on_change)
             
         def trigger_change(self):
             self.at.on_change()
@@ -590,7 +590,8 @@ class At:
         target_len = len(self.target_for)
         constraint = self.target_for.pop(attr_string, None)
         if target_len and not len(self.target_for) and not len(self.source_for):
-            At.observer.stop_observing(self.view)
+            #At.observer.stop_observing(self.view)
+            remove_on_change(self.view, self.on_change)
         if constraint:
             source_at = constraint.source.at
             source_len = len(source_at.source_for)
@@ -598,7 +599,8 @@ class At:
             if (source_len and
             not len(source_at.source_for) and 
             not len(source_at.target_for)):
-                At.observer.stop_observing(source_at.view)
+                #At.observer.stop_observing(source_at.view)
+                remove_on_change(source_at.view, source_at.on_change)
         
     @property
     def _heading(self):
