@@ -1,6 +1,6 @@
 import objc_util
 
-import anchor.objc_plus as objc_plus
+import anchors.objc_plus as objc_plus
 
 
 class NSKeyValueObserving(objc_plus.ObjCDelegate):
