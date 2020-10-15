@@ -185,14 +185,15 @@ attr(heading_label).text = at(pointer).heading + (
     lambda angle: f"{int(math.degrees(angle))%360:03}°"
 )
 
-#  ----- Dock
+#  ----- Dock & attach
 
-dock(make_label('top\ncenter')).top_center(dock_area)
+top_center = make_label('top\ncenter')
+dock(top_center).top_center(dock_area)
 dock(make_label('left')).left(dock_area)
 dock(make_label('bottom\nright')).bottom_right(dock_area)
-center_label = make_label('center')
-dock(center_label).center(dock_area)
-#dock(center_label).above(make_label('below'))
+dock(make_label('center')).center(dock_area)
+
+attach(make_label('attach')).below(top_center)
 
 #  ----- Align
 
@@ -252,8 +253,8 @@ if show_markers:
     at(m5).left = at(heading_label).right
     
     m6 = create_marker(dock_area)
-    at(m6).center_x = at(dock_area).center_x * 1.5
-    at(m6).center_y = at(dock_area).center_y / 2
+    at(m6).center_x = at(dock_area).center_x
+    at(m6).center_y = at(dock_area).center_y * 1.5
     
     m7 = create_marker(align_area)
     align(m7).center_x(align_area)

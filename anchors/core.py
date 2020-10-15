@@ -732,6 +732,16 @@ class Dock:
     right_center = partialmethod(_dock, 'RY')
     center = partialmethod(_dock, 'C')
     
+    
+def dock(view) -> Dock:
+    return Dock(view)
+    
+    
+class Attach:
+    
+    def __init__(self, view):
+        self.view = view
+    
     def between(self, top=None, bottom=None, left=None, right=None):
         a_self = at(self.view)
         if top:
@@ -752,27 +762,27 @@ class Dock:
             a_self.center_y = a.center_y
 
     def above(self, other):
+        other.superview.add_subview(self.view)
         at(self.view).bottom = at(other).top
         align(self.view).center_x(other)
         
     def below(self, other):
+        other.superview.add_subview(self.view)
         at(self.view).top = at(other).bottom
         at(self.view).center_x = at(other).center_x
-        at(self.view).width = at(other).width
-        #align(self.view).center_x(other)
-        #align(self.view).width(other)
         
-    def to_the_left(self, other):
+    def left_of(self, other):
+        other.superview.add_subview(self.view)
         at(self.view).right = at(other).left
         align(self.view).center_y(other)
         
-    def to_the_right(self, other):
+    def right_of(self, other):
         at(self.view).left = at(other).right
         align(self.view).center_y(other)
         
         
-def dock(view) -> Dock:
-    return Dock(view)
+def attach(view) -> Attach:
+    return Attach(view)
     
     
 class Align:
