@@ -632,6 +632,9 @@ class At:
     fit_size = _prop('fit_size')
     fit_width = _prop('fit_width')
     fit_height = _prop('fit_height')
+    
+    def _remove_anchors(self):
+        ...
                 
     
 # Direct access functions
@@ -777,6 +780,7 @@ class Attach:
         align(self.view).center_y(other)
         
     def right_of(self, other):
+        other.superview.add_subview(self.view)
         at(self.view).left = at(other).right
         align(self.view).center_y(other)
         
@@ -948,6 +952,10 @@ class Flow:
 
 def flow(*views):
     return Flow(*views)
+    
+def remove_anchors(view):
+    at(view)._remove_anchors()
+        
     
 def size_to_fit(view):
     view.size_to_fit()
